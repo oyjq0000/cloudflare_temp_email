@@ -10,12 +10,19 @@ import { api as userApi } from './user_api';
 import { api as adminApi } from './admin_api';
 import { api as apiSendMail } from './mails_api/send_mail_api'
 import { api as telegramApi } from './telegram_api'
+import { api as contactApi } from './contact'
 
 import i18n from './i18n';
 import { email } from './email';
 import { scheduled } from './scheduled';
 import { getPasswords, getBooleanValue, getDomains, checkIsAdmin } from './utils';
 import { checkAccessControl } from './ip_blacklist';
+import {
+	contactModeDisabledResponse,
+	getContactAdminSecurityStatus,
+	isContactModePublicPathBlocked,
+	resolveAppMode,
+} from './app_mode';
 
 const API_PATHS = [
 	"/api/",
@@ -44,6 +51,13 @@ app.use('/*', async (c, next) => {
 			url.pathname = ""
 		}
 		return c.env.ASSETS.fetch(url);
+	}
+
+	if (
+		resolveAppMode(c.env) === 'contact'
+		&& isContactModePublicPathBlocked(c.req.path)
+	) {
+		return c.json(contactModeDisabledResponse(), 403)
 	}
 
 	// save language in context
@@ -251,7 +265,13 @@ app.use('/admin/*', async (c, next) => {
 	}
 
 	// disable admin api check
-	if (getBooleanValue(c.env.DISABLE_ADMIN_PASSWORD_CHECK)) {
+	if (
+		getBooleanValue(c.env.DISABLE_ADMIN_PASSWORD_CHECK)
+		&& (
+			resolveAppMode(c.env) === 'temp'
+			|| getBooleanValue(c.env.E2E_TEST_MODE)
+		)
+	) {
 		await next();
 		return;
 	}
@@ -267,6 +287,7 @@ app.route('/', userApi)
 app.route('/', adminApi)
 app.route('/', apiSendMail)
 app.route('/', telegramApi)
+app.route('/', contactApi)
 
 const health_check = async (c: Context<HonoCustomType>) => {
 	const lang = c.req.raw.headers.get("x-lang") || c.env.DEFAULT_LANG;
@@ -277,7 +298,12 @@ const health_check = async (c: Context<HonoCustomType>) => {
 	if (!c.env.JWT_SECRET) {
 		return c.text(msgs.JWTSecretNotSetMsg, 400);
 	}
-	if (getDomains(c).length === 0) {
+	if (resolveAppMode(c.env) === 'contact') {
+		const adminSecurity = getContactAdminSecurityStatus(c.env)
+		if (!adminSecurity.secure) {
+			return c.text(adminSecurity.code, 503)
+		}
+	} else if (getDomains(c).length === 0) {
 		return c.text(msgs.DomainsNotSetMsg, 400);
 	}
 	return c.text("OK");

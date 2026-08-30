@@ -13,6 +13,15 @@ export const useGlobalState = createGlobalState(
         const useSimpleIndex = useLocalStorage('useSimpleIndex', false);
         const openSettings = ref({
             fetched: false,
+            mode: 'temp',
+            capabilities: {
+                contactHub: false,
+                publicMailbox: true,
+                publicAddressCreation: true,
+                publicRegistration: true,
+                publicSendMail: true,
+                userPortal: true,
+            },
             title: '',
             announcement: '',
             alwaysShowAnnouncement: false,

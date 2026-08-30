@@ -21,7 +21,7 @@
 ## Phase 0
 
 - Status: completed with host E2E environment limitation recorded.
-- Commit: `docs(contact-hub): add architecture and execution baseline` (hash recorded in the next phase update after commit creation).
+- Commit: `f787a53` (`docs(contact-hub): add architecture and execution baseline`).
 - Files: `CODEX_GOAL.md`, `contact-mail-hub-codex-goal.md`, `ARCHITECTURE.md`, `SCHEMA.md`, `OUTBOUND_STATE_MACHINE.md`, `PROGRESS.md`.
 - Tests: Worker lint pass; explicit Worker dry-run build pass; Frontend 60/60 pass; Frontend build pass; E2E infrastructure-blocked before test execution.
 - Decisions: isolate Contact code, keep Temp Mode/provider order intact, use independent numeric migrations, reject unknown automatic retry/fallback, retain D1 fallback on R2 failure, and keep all production operations manual.
@@ -29,12 +29,12 @@
 
 ## Phase 1
 
-- Status: pending.
-- Commit: pending.
-- Files: pending.
-- Tests: pending.
-- Decisions: pending.
-- Remaining risks: pending.
+- Status: completed.
+- Commit: `feat(contact-mode): add private mode capability gates` (hash recorded in the next phase update after commit creation).
+- Files: centralized Worker app-mode policy and tests, authenticated Contact status route, settings/health/admin middleware integration, Contact Hub/Login frontend shell, mode-aware router/layout/store/API, Contact E2E fixture/API spec, Worker variable template/docs, and bilingual changelogs.
+- Tests: Worker 15/15; Worker lint pass; explicit Worker dry-run build pass; Frontend 63/63; Frontend production build pass; Compose configuration pass; Playwright discovery pass (162 tests). The Contact API suite ran against local `wrangler dev` with the committed mock config and passed 3/3, proving settings redaction, all public 403 gates, unauthenticated 401, and authenticated status 200. Full Docker E2E remains blocked by the host daemon issue recorded in Baseline.
+- Decisions: all `/api/*` mailbox APIs, `/external/*`, `/telegram/*`, address credential login, and non-admin user-portal APIs are rejected before business handlers in Contact Mode. User password login/settings and passkey authentication remain available only to support `ADMIN_USER_ROLE`; registration, OAuth, verification, mailbox management, and sending remain blocked. Contact public settings return empty legacy domain arrays.
+- Remaining risks: browser/E2E execution still requires a healthy Docker daemon; Domain/Inbox APIs are intentionally absent until later phases.
 
 ## Phase 2
 

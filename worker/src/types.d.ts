@@ -25,9 +25,12 @@ type Bindings = {
     SEND_MAIL: SendEmail
     ASSETS: Fetcher
     AI: Ai
+    CONTACT_R2: R2Bucket | undefined
 
     // config
     DEFAULT_LANG: string | undefined
+    CONTACT_MAIL_MODE: string | boolean | undefined
+    CONTACT_ALLOWED_ORIGINS: string | string[] | undefined
     TITLE: string | undefined
     ANNOUNCEMENT: string | undefined | null
     ALWAYS_SHOW_ANNOUNCEMENT: string | boolean | undefined

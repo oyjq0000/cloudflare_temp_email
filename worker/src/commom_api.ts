@@ -4,10 +4,14 @@ import utils from './utils';
 import { CONSTANTS } from './constants';
 import { isS3Enabled } from './mails_api/s3_attachment';
 import { isAnySendMailEnabled } from './common';
+import { getAppCapabilities, resolveAppMode } from './app_mode';
 
 const api = new Hono<HonoCustomType>
 
 api.get('/open_api/settings', async (c) => {
+    const mode = resolveAppMode(c.env);
+    const capabilities = getAppCapabilities(mode);
+    const isContactMode = mode === 'contact';
     // check header x-custom-auth
     let needAuth = false;
     const passwords = utils.getPasswords(c);
@@ -22,30 +26,35 @@ api.get('/open_api/settings', async (c) => {
     const imapProxyConfig = smtpImapProxyConfig.imap || {};
 
     return c.json({
+        "mode": mode,
+        "capabilities": capabilities,
         "title": c.env.TITLE,
         "announcement": utils.getStringValue(c.env.ANNOUNCEMENT),
         "alwaysShowAnnouncement": utils.getBooleanValue(c.env.ALWAYS_SHOW_ANNOUNCEMENT),
-        "prefix": utils.trimLower(c.env.PREFIX),
+        "prefix": isContactMode ? "" : utils.trimLower(c.env.PREFIX),
         "addressRegex": utils.getStringValue(c.env.ADDRESS_REGEX),
         "minAddressLen": utils.getIntValue(c.env.MIN_ADDRESS_LEN, 1),
         "maxAddressLen": utils.getIntValue(c.env.MAX_ADDRESS_LEN, 30),
-        "defaultDomains": utils.getDefaultDomains(c),
-        "domains": utils.getDomains(c),
-        "randomSubdomainDomains": utils.getRandomSubdomainDomains(c),
-        "domainLabels": utils.getStringArray(c.env.DOMAIN_LABELS),
+        "defaultDomains": isContactMode ? [] : utils.getDefaultDomains(c),
+        "domains": isContactMode ? [] : utils.getDomains(c),
+        "randomSubdomainDomains": isContactMode ? [] : utils.getRandomSubdomainDomains(c),
+        "domainLabels": isContactMode ? [] : utils.getStringArray(c.env.DOMAIN_LABELS),
         "needAuth": needAuth,
         "adminContact": c.env.ADMIN_CONTACT,
-        "enableUserCreateEmail": utils.getBooleanValue(c.env.ENABLE_USER_CREATE_EMAIL),
-        "disableAnonymousUserCreateEmail": utils.getBooleanValue(c.env.DISABLE_ANONYMOUS_USER_CREATE_EMAIL),
+        "enableUserCreateEmail": capabilities.publicAddressCreation
+            && utils.getBooleanValue(c.env.ENABLE_USER_CREATE_EMAIL),
+        "disableAnonymousUserCreateEmail": isContactMode
+            || utils.getBooleanValue(c.env.DISABLE_ANONYMOUS_USER_CREATE_EMAIL),
         "disableCustomAddressName": utils.getBooleanValue(c.env.DISABLE_CUSTOM_ADDRESS_NAME),
-        "enableUserDeleteEmail": utils.getBooleanValue(c.env.ENABLE_USER_DELETE_EMAIL),
+        "enableUserDeleteEmail": capabilities.publicMailbox
+            && utils.getBooleanValue(c.env.ENABLE_USER_DELETE_EMAIL),
         "enableAutoReply": utils.getBooleanValue(c.env.ENABLE_AUTO_REPLY),
         "enableIndexAbout": utils.getBooleanValue(c.env.ENABLE_INDEX_ABOUT),
         "copyright": c.env.COPYRIGHT,
         "cfTurnstileSiteKey": c.env.CF_TURNSTILE_SITE_KEY,
         "enableWebhook": utils.getBooleanValue(c.env.ENABLE_WEBHOOK),
         "isS3Enabled": isS3Enabled(c),
-        "enableSendMail": isAnySendMailEnabled(c),
+        "enableSendMail": capabilities.publicSendMail && isAnySendMailEnabled(c),
         "version": CONSTANTS.VERSION,
         "showGithub": !utils.getBooleanValue(c.env.DISABLE_SHOW_GITHUB),
         "showGithubForUser": !utils.getBooleanValue(c.env.DISABLE_SHOW_GITHUB_FOR_USER),

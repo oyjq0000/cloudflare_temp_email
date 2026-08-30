@@ -13,6 +13,15 @@ test.describe('Health & Settings', () => {
     expect(res.ok()).toBe(true);
 
     const settings = await res.json();
+    expect(settings.mode).toBe('temp');
+    expect(settings.capabilities).toMatchObject({
+      contactHub: false,
+      publicMailbox: true,
+      publicAddressCreation: true,
+      publicRegistration: true,
+      publicSendMail: true,
+      userPortal: true,
+    });
     expect(settings.domains).toContain('test.example.com');
     expect(settings.defaultDomains).toContain('test.example.com');
     expect(settings.prefix).toBe('tmp');

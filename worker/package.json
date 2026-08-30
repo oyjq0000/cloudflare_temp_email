@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "test": "node --test",
     "lint": "eslint src",
     "deploy": "wrangler deploy --minify",
     "start": "wrangler dev",

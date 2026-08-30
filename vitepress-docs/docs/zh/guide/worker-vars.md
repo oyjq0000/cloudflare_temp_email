@@ -17,6 +17,16 @@
 > 这里填写的所有域名（包括下文「邮箱相关变量」里的 `DEFAULT_DOMAINS`、`USER_ROLES.domains`、`RANDOM_SUBDOMAIN_DOMAINS` 等）必须是你**已经在 Cloudflare Email Routing 中启用并完成邮件 DNS 记录下发**的域名。Worker 部署完成后，还需要把该域名的 Catch-all 规则绑定到这个 Worker，否则邮件无法投递到 Worker。
 > 配置步骤见 [Cloudflare Email Routing](/zh/guide/email-routing)。
 
+## Contact Hub 模式
+
+| 变量名              | 类型      | 说明                                                                 | 示例   |
+| ------------------- | --------- | -------------------------------------------------------------------- | ------ |
+| `CONTACT_MAIL_MODE` | 文本/JSON | 启用私有多域名 Contact Mail Hub；未显式设为 `true` 时保持临时邮箱模式 | `true` |
+
+启用后，Worker 会在后端拒绝公共邮箱创建、地址登录/管理、公共发件、用户注册、OAuth、用户门户及 Telegram 公共地址入口；前端 `/` 与 `/user` 会转到私有 `/hub`。`/open_api/settings` 只公开模式和 capability，不会返回 Contact Domain、Mailbox、Provider 或 Secret Reference。
+
+Contact Mode 必须配置非空 `ADMIN_PASSWORDS`，或配置 `ADMIN_USER_ROLE` 并使用具备该角色的账户登录。生产环境不得设置 `DISABLE_ADMIN_PASSWORD_CHECK=true`；该组合会让 `/health_check` 返回不安全配置错误。只有同时设置 `E2E_TEST_MODE=true` 的本地测试环境允许免密例外。
+
 ## 后台相关变量
 
 | 变量名                         | 类型      | 说明                                 | 示例             |

@@ -4,15 +4,19 @@ import User from '../views/User.vue'
 import UserOauth2Callback from '../views/user/UserOauth2Callback.vue'
 import i18n from '../i18n'
 import { useGlobalState } from '../store'
+import { api } from '../api'
+import { getModeRedirect } from '../utils/app-mode'
 import {
     DEFAULT_LOCALE,
     getBrowserLocales,
     getPreferredLocale,
     replaceLocaleInFullPath,
     resolveSupportedLocale,
+    getPathWithLocale,
+    stripLocaleFromPath,
 } from '../i18n/utils'
 
-const { jwt, preferredLocale } = useGlobalState()
+const { jwt, openSettings, preferredLocale } = useGlobalState()
 
 const router = createRouter({
     history: createWebHistory(),
@@ -21,6 +25,12 @@ const router = createRouter({
             path: '/',
             alias: '/:lang/',
             component: Index
+        },
+        {
+            path: '/hub',
+            alias: '/:lang/hub',
+            component: () => import('../views/contact/ContactHub.vue'),
+            meta: { contactLayout: true },
         },
         {
             path: '/user',
@@ -50,7 +60,7 @@ const router = createRouter({
     ]
 });
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
     const routeLocale = resolveSupportedLocale(to.path.split('/')[1])
     const resolvedLocale = routeLocale || DEFAULT_LOCALE
     i18n.global.locale.value = resolvedLocale
@@ -86,6 +96,21 @@ router.beforeEach((to, from, next) => {
 
     if (routeLocale === DEFAULT_LOCALE) {
         return next(replaceLocaleInFullPath(to.fullPath, DEFAULT_LOCALE))
+    }
+
+    if (!openSettings.value.fetched) {
+        await api.getOpenSettings()
+    }
+
+    const basePath = stripLocaleFromPath(to.path)
+    const modeRedirect = getModeRedirect(basePath, openSettings.value.mode)
+    if (modeRedirect) {
+        return next({
+            path: getPathWithLocale(modeRedirect, resolvedLocale),
+            query: to.query,
+            hash: to.hash,
+            replace: true,
+        })
     }
 
     next()

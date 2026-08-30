@@ -1,0 +1,28 @@
+name = "cloudflare_temp_email_contact"
+main = "src/worker.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = [ "nodejs_compat" ]
+keep_vars = true
+
+[vars]
+CONTACT_MAIL_MODE = true
+PREFIX = "MUST_NOT_LEAK"
+DEFAULT_DOMAINS = ["PRIVATE-DEFAULT.EXAMPLE.COM"]
+DOMAINS = ["PRIVATE-CONTACT.EXAMPLE.COM"]
+JWT_SECRET = "e2e-contact-test-secret-key"
+BLACK_LIST = ""
+ENABLE_USER_CREATE_EMAIL = true
+ENABLE_USER_DELETE_EMAIL = true
+DEFAULT_SEND_BALANCE = 10
+ADMIN_PASSWORDS = ["e2e-contact-admin"]
+DISABLE_ADMIN_PASSWORD_CHECK = false
+E2E_TEST_MODE = true
+
+[[kv_namespaces]]
+binding = "KV"
+id = "e2e-contact-kv-00000000-0000-0000-0000-000000000000"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "e2e-contact-email"
+database_id = "e2e-contact-db-00000000-0000-0000-0000-000000000000"

@@ -74,13 +74,16 @@ const apiFetch = async (path, options = {}) => {
 const getOpenSettings = async (message, notification) => {
     try {
         const res = await api.fetch("/open_api/settings");
+        const mode = res["mode"] === "contact" ? "contact" : "temp";
         const domains = Array.isArray(res["domains"]) ? res["domains"] : [];
         const domainLabels = res["domainLabels"] || [];
-        if (domains.length < 1) {
-            message.error("No domains found, please check your worker settings");
+        if (mode === "temp" && domains.length < 1) {
+            message?.error?.("No domains found, please check your worker settings");
         }
         Object.assign(openSettings.value, {
             ...res,
+            mode,
+            capabilities: res["capabilities"] || openSettings.value.capabilities,
             title: res["title"] || "",
             prefix: res["prefix"] || "",
             minAddressLen: res["minAddressLen"] || 1,
@@ -121,7 +124,7 @@ const getOpenSettings = async (message, notification) => {
                 || openSettings.value.alwaysShowAnnouncement)
         ) {
             announcement.value = openSettings.value.announcement;
-            notification.info({
+            notification?.info?.({
                 content: () => {
                     return h("div", {
                         innerHTML: sanitizeHtml(announcement.value)
@@ -130,7 +133,7 @@ const getOpenSettings = async (message, notification) => {
             });
         }
     } catch (error) {
-        message.error(error.message || "error");
+        message?.error?.(error.message || "error");
     } finally {
         openSettings.value.fetched = true;
     }

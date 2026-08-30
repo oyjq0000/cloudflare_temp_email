@@ -17,6 +17,16 @@
 > Every domain you put here (including `DEFAULT_DOMAINS`, `USER_ROLES.domains`, `RANDOM_SUBDOMAIN_DOMAINS` further below) **must already have Cloudflare Email Routing enabled and its email DNS records provisioned**. After the Worker is deployed, bind the domain's Catch-all rule to that Worker; otherwise inbound mail will never reach the Worker.
 > See [Cloudflare Email Routing](/en/guide/email-routing) for the setup steps.
 
+## Contact Hub Mode
+
+| Variable Name       | Type      | Description                                                                                           | Example |
+| ------------------- | --------- | ----------------------------------------------------------------------------------------------------- | ------- |
+| `CONTACT_MAIL_MODE` | Text/JSON | Enable the private multi-domain Contact Mail Hub; Temp Mode remains active unless explicitly `true` | `true`  |
+
+When enabled, the Worker rejects public mailbox creation, address login/management, public sending, registration, OAuth, the user portal, and Telegram public-address entry points. The frontend redirects `/` and `/user` to the private `/hub`. `/open_api/settings` exposes only mode/capability information and never Contact Domains, Mailboxes, Providers, or Secret References.
+
+Contact Mode requires non-empty `ADMIN_PASSWORDS`, or `ADMIN_USER_ROLE` with a successfully authenticated account carrying that role. Production must not set `DISABLE_ADMIN_PASSWORD_CHECK=true`; that combination makes `/health_check` report an unsafe configuration. The passwordless exception is limited to local tests that also set `E2E_TEST_MODE=true`.
+
 ## Console Related Variables
 
 | Variable Name                  | Type      | Description                                             | Example          |

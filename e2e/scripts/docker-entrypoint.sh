@@ -59,6 +59,21 @@ if [ -n "${WORKER_GZIP_URL:-}" ]; then
   done
 fi
 
+if [ -n "${WORKER_CONTACT_URL:-}" ]; then
+  echo "==> Waiting for contact worker at $WORKER_CONTACT_URL ..."
+  for i in $(seq 1 60); do
+    if curl -sf "$WORKER_CONTACT_URL/health_check" > /dev/null 2>&1; then
+      echo "    Contact worker ready after ${i}s"
+      break
+    fi
+    if [ "$i" -eq 60 ]; then
+      echo "ERROR: Contact worker not ready after 60s"
+      exit 1
+    fi
+    sleep 1
+  done
+fi
+
 echo "==> Waiting for frontend at $FRONTEND_URL ..."
 for i in $(seq 1 60); do
   if curl -skf "$FRONTEND_URL" > /dev/null 2>&1; then
@@ -108,6 +123,13 @@ if [ -n "${WORKER_GZIP_URL:-}" ]; then
   curl -sf -X POST "$WORKER_GZIP_URL/admin/db_initialize" > /dev/null
   curl -sf -X POST "$WORKER_GZIP_URL/admin/db_migration" > /dev/null
   echo "    Gzip worker database initialized"
+fi
+
+if [ -n "${WORKER_CONTACT_URL:-}" ]; then
+  echo "==> Initializing contact worker database"
+  curl -sf -H "x-admin-auth: ${CONTACT_ADMIN_PASSWORD}" -X POST "$WORKER_CONTACT_URL/admin/db_initialize" > /dev/null
+  curl -sf -H "x-admin-auth: ${CONTACT_ADMIN_PASSWORD}" -X POST "$WORKER_CONTACT_URL/admin/db_migration" > /dev/null
+  echo "    Contact worker database initialized"
 fi
 
 echo "==> Running Playwright tests"
