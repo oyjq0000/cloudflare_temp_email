@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Linux container entrypoints must remain LF-only.
 set -euo pipefail
 
 echo "==> Waiting for worker at $WORKER_URL ..."
@@ -86,6 +87,21 @@ for i in $(seq 1 60); do
   fi
   sleep 1
 done
+
+if [ -n "${FRONTEND_CONTACT_URL:-}" ]; then
+  echo "==> Waiting for contact frontend at $FRONTEND_CONTACT_URL ..."
+  for i in $(seq 1 60); do
+    if curl -skf "$FRONTEND_CONTACT_URL" > /dev/null 2>&1; then
+      echo "    Contact frontend ready after ${i}s"
+      break
+    fi
+    if [ "$i" -eq 60 ]; then
+      echo "ERROR: Contact frontend not ready after 60s"
+      exit 1
+    fi
+    sleep 1
+  done
+fi
 
 echo "==> Waiting for smtp-proxy-tls SMTP on $SMTP_PROXY_TLS_HOST:$SMTP_PROXY_TLS_SMTP_PORT ..."
 for i in $(seq 1 30); do

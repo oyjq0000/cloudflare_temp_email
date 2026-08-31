@@ -12,7 +12,19 @@ oyjq0000/main (upstream mirror, no Contact product commits)
 oyjq0000/contact-hub (long-lived product branch)
 ```
 
-V1 started from `f92b059aac0d89e2c106601b6857dce9dcae07d3`; local `main`, `origin/main`, and `upstream/main` all pointed to that commit when implementation began. No fetch, push, force-push, deployment, or remote mutation was performed as part of the Goal.
+V1 started from `f92b059aac0d89e2c106601b6857dce9dcae07d3`; local `main`, `origin/main`, and `upstream/main` all pointed to that commit when implementation began. The first reviewed post-V1 synchronization advanced all three locally recorded mirror refs to `70206c61efa723ef24143eca1d27449ce98a6e0c` (`feat: add single-mail read status (#1125)`) and merged that history through `codex/contact-hub-upstream-integration`. No push, force-push, deployment, production mutation, or production Secret access was performed.
+
+## Completed synchronization: mail read status
+
+The `f92b059..70206c6` upstream range added single-mail read status, a migration, API/browser coverage, and frontend state/rendering changes. Conflict resolution preserved these mode boundaries:
+
+- Temp Mode exposes and uses upstream `enableMailReadStatus` normally.
+- Contact Mode returns `enableMailReadStatus=false` because public mailbox surfaces are disabled and Contact read state remains under authenticated `/admin/contact/*` APIs.
+- The Email Worker dispatches Contact ingestion before Legacy `storeRawMail`; Temp Mode uses the upstream raw-mail storage helper unchanged.
+- Contact changelog entries and upstream read-status entries are both retained.
+- The complete fresh-volume Compose suite passed 196/196, followed by Worker 41/41/lint/build, Frontend 67/67/build, Compose config, LF, and whitespace gates.
+
+During the full-topology run, LF shell enforcement, a Contact-specific frontend proxy/exact local Origin, and latest-request-wins Inbox loading were added. These are integration hardening changes, not production Cloudflare configuration.
 
 ## Human-reviewed sync procedure
 

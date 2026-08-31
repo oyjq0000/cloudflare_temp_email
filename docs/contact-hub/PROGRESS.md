@@ -92,9 +92,9 @@
 
 ## Phase 8
 
-- Status: implementation and every host-executable mock/local gate completed; the single Docker Compose orchestration command is host-infrastructure blocked before container startup.
-- Commits: `9b469e0` (`test(contact-hub): complete full regression and browser coverage`); final documentation closure commit contains `FINAL_REPORT.md` and the completed runbooks.
-- Files: E2E-only guarded bulk seed; 50-Domain/1,000-message and attachment-footprint API tests; Contact browser security/mobile test; portable host/Docker Mailpit hostname support; client filename sanitization; rendered remote-image consent fix; complete CORS frontend-header allowlist; `SECURITY.md`, `DEPLOYMENT.md`, `UPSTREAM_SYNC.md`, and `FINAL_REPORT.md`.
+- Status: completed, including the full Docker Compose Temp/Contact/browser/Mailpit regression and the reviewed upstream mail-read-status synchronization.
+- Commits: `9b469e0` (`test(contact-hub): complete full regression and browser coverage`); the documentation closure commit; and the final reviewed upstream integration merge based on `70206c6`.
+- Files: E2E-only guarded bulk seed; 50-Domain/1,000-message and attachment-footprint API tests; Contact browser security/mobile test; portable host/Docker Mailpit hostname support; dual Temp/Contact frontend proxies; client filename sanitization; rendered remote-image consent fix; exact Contact CORS origins/headers; latest-request-wins Inbox loading; LF-enforced container entry scripts; `SECURITY.md`, `DEPLOYMENT.md`, `UPSTREAM_SYNC.md`, and `FINAL_REPORT.md`.
 - Tests:
   - Worker: 41/41; lint pass; Wrangler dry-run build pass (no deployment).
   - Frontend: 67/67 in 5 files; production build pass with only the existing large-chunk warning.
@@ -102,9 +102,11 @@
   - Contact browser: 2/2 in Chromium against an isolated Contact database. The test proves verified login, mobile full-width drawer, server filtering, safe HTML, default remote blocking, explicit remote consent, sanitized SVG filename, Spam round trip, and Operations health.
   - Performance: 50 Domains and 1,000 messages seeded; 100-row page measured 50,422 UTF-8 bytes/202 ms with no body fields; 32-byte plus 512-KiB attachment list measured 1,076 bytes with no attachment payload.
   - Temp API: 111 unique tests have passing evidence. The broad reused-state run passed 106; two Cleanup cases passed 2/2 on a fresh D1; the dedicated SEND_MAIL topology passed 18/18, including the three binding cases missing from the broad topology. SMTP tests used local Mailpit only.
-  - Compose config: pass. Full `npm test`/`docker compose up` cannot start because `npipe:////./pipe/dockerDesktopLinuxEngine` does not exist on this host. No assertion failed in that command because no container started.
-- Decisions: the performance seed endpoint is limited to 100 Mailboxes/2,000 messages, administrator protected, and returns 404 without `E2E_TEST_MODE`. Browser discovery found and fixed an actual cross-origin preflight gap (`X-Fingerprint` and existing auth headers) and a Naive UI alert-slot incompatibility. Host Mailpit accepts `MAILPIT_SMTP_HOST`; Docker keeps the default `mailpit` service hostname.
-- Remaining validation limitation: the all-in-one Docker run, gzip Worker project, SMTP/IMAP proxy containers, and the legacy browser suite still require a working Docker Desktop Linux daemon. All Contact V1 behavior and the complete Temp API set were executed without real credentials or production resources; the exact manual follow-up is in `FINAL_REPORT.md`.
+  - Full Compose: 196/196 Playwright tests passed with fresh volumes across Temp, Contact, gzip, environment-off, subdomain, SEND_MAIL, SMTP/TLS/IMAP proxy, Mailpit, and browser projects. `test-results/.last-run.json` recorded `status: passed` with no failed tests. The Windows Compose wrapper required an explicit interrupt only after Playwright had completed and containers had already received shutdown signals; `docker compose down -v` then completed successfully.
+  - Compose config: pass. Both container entry scripts are committed as LF through `.gitattributes`.
+- Decisions: the performance seed endpoint is limited to 100 Mailboxes/2,000 messages, administrator protected, and returns 404 without `E2E_TEST_MODE`. Browser discovery found and fixed cross-origin preflight gaps and a Naive UI alert-slot incompatibility. The full topology additionally exposed a Contact frontend Origin mismatch and an Inbox request race: Compose now has a Contact-specific frontend proxy/origin, and only the newest Inbox request may update UI state. Browser filtering asserts the exact server response before asserting the row. Host Mailpit accepts `MAILPIT_SMTP_HOST`; Docker keeps the default `mailpit` service hostname.
+- Upstream synchronization: local `main`, `origin/main`, and `upstream/main` were verified at `70206c61efa723ef24143eca1d27449ce98a6e0c` (`feat: add single-mail read status (#1125)`). The integration preserves read status in Temp Mode while returning `enableMailReadStatus=false` in Contact Mode and retaining the Contact inbound dispatch before Legacy raw-mail storage. All final gates were rerun after conflict resolution.
+- Remaining validation limitation: none for the local V1 Definition of Done. Production credentials, resources, DNS/routing, staging migration, backup/restore, deployment, and smoke/rollback drills remain explicit human actions and were not executed.
 
 ## Manual production actions
 

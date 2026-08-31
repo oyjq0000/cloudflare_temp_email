@@ -26,6 +26,7 @@ const showReply = ref(false)
 const loading = ref(false)
 const detailLoading = ref(false)
 const filters = ref({ domain_id: null, mailbox_id: null, from: '', to: '', subject: '', date_from: '', date_to: '' })
+let latestLoadId = 0
 
 const copy = computed(() => locale.value === 'zh' ? {
   search: '筛选', reset: '重置', from: '发件人', to: '收件人', subject: '主题',
@@ -60,20 +61,21 @@ const requestFilters = () => ({
 })
 
 const load = async (reset = true) => {
-  if (loading.value) return
+  const loadId = ++latestLoadId
   loading.value = true
   try {
     const response = await contactApi.listMessages({
       ...requestFilters(),
       cursor: reset ? undefined : nextCursor.value,
     })
+    if (loadId !== latestLoadId) return
     items.value = reset ? (response.results || []) : [...items.value, ...(response.results || [])]
     nextCursor.value = response.nextCursor
     emit('counts', response.counts || { inbox: 0, unread: 0, spam: 0 })
   } catch (error) {
-    notification.error(error.message)
+    if (loadId === latestLoadId) notification.error(error.message)
   } finally {
-    loading.value = false
+    if (loadId === latestLoadId) loading.value = false
   }
 }
 

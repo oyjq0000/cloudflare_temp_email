@@ -2,11 +2,12 @@
 
 ## Status and revision
 
-- Goal status: implementation completed; final all-in-one Docker orchestration validation is partially blocked by the host Docker Desktop Linux daemon.
+- Goal status: completed, including full Docker Compose regression and reviewed upstream synchronization.
 - Branch: `contact-hub`.
 - Audit/base SHA: `f92b059aac0d89e2c106601b6857dce9dcae07d3`.
-- Final implementation/test HEAD: `9b469e0` (`test(contact-hub): complete full regression and browser coverage`).
-- Final branch HEAD: the documentation closure commit containing this report, immediately after `9b469e0`; use `git rev-parse HEAD` for the immutable value in the reviewed checkout.
+- Final implementation/test baseline: `9b469e0` (`test(contact-hub): complete full regression and browser coverage`).
+- Upstream integration base: `70206c61efa723ef24143eca1d27449ce98a6e0c` (`feat: add single-mail read status (#1125)`).
+- Final branch HEAD: the reviewed upstream integration merge containing this report; use `git rev-parse HEAD` for its immutable value in the reviewed checkout.
 - Production actions: none. No push, deployment, production resource mutation, real provider call, or real Secret occurred.
 
 ## 1. Architecture summary
@@ -31,6 +32,7 @@ Contact outbound commits an idempotent intent, atomically claims it, records an 
 | 7 | `fa2ea94` | `feat(contact-ops): add dns health and safety controls` |
 | 8 | `9b469e0` | `test(contact-hub): complete full regression and browser coverage` |
 | 8 docs | report commit | `docs(contact-hub): add deployment rollback and final report` |
+| 8 sync | integration merge | `merge: synchronize contact hub with upstream mail read status` |
 
 ## 3. Key files and ownership
 
@@ -99,7 +101,7 @@ npm run lint
 npm run build
 ```
 
-Result: 41/41 unit tests passed; lint passed; Wrangler 4.124 dry-run build passed (1,265.65 KiB / gzip 347.89 KiB). `npm run build` used `wrangler deploy --dry-run`; it did not deploy.
+Result: 41/41 unit tests passed; lint passed; Wrangler 4.124 dry-run build passed (1,265.96 KiB / gzip 348.22 KiB). `npm run build` used `wrangler deploy --dry-run`; it did not deploy.
 
 ### Frontend
 
@@ -127,25 +129,19 @@ Performance result: 50 Domains and 1,000 indexed messages; a 100-row page measur
 
 The host-executable complete Temp API set contains 111 unique tests. A broad local run passed 106; two state-sensitive Cleanup cases then passed 2/2 on a fresh isolated D1; a dedicated local `SEND_MAIL` binding topology passed 18/18, including the three binding tests absent from the broad topology. Therefore every one of the 111 unique Temp API cases has passing evidence. SMTP cases used local Mailpit and fake configuration only.
 
-### Docker Compose limitation
+### Full Docker Compose regression
 
-`docker compose config --quiet` passed. `docker version` and `npm test` failed before any container/test assertion because the Docker Desktop Linux pipe is absent:
-
-```text
-failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine
-open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.
-```
-
-The missing daemon prevents the single-command Compose topology, gzip Worker project, SMTP/IMAP proxy containers, and Legacy browser suite from being validated together. Local Wrangler instances, a private isolated D1/R2 state, Chromium, provider mocks, a dedicated local `SEND_MAIL` binding, and official portable Mailpit covered all Contact V1 and all Temp API assertions, but cannot faithfully emulate the proxy/container networking projects.
-
-Manual unblock command after Docker Desktop reports a healthy Linux engine:
+After Docker Desktop recovered, the complete topology was run from fresh volumes:
 
 ```text
 cd e2e
+npm run test:down
 npm test
 ```
 
-If it passes, no code change is expected; record the report alongside this file. If it fails an assertion, resume Phase 8 at “full Docker Compose regression,” fix without weakening tests, rerun all affected gates, update this report, and create a new local commit.
+Result: 196/196 Playwright tests passed across the Temp, Contact, gzip, environment-off, subdomain, SEND_MAIL, SMTP/TLS/IMAP proxy, Mailpit, and browser projects. `test-results/.last-run.json` recorded `status: passed` and an empty failed-test list. `docker compose config --quiet` passed, and `docker compose down -v` removed the local test containers, network, and volumes.
+
+The recovered run exposed and fixed three integration-only issues: CRLF shell entry scripts, Contact browser requests originating from the wrong frontend proxy/origin, and an Inbox initial-load/filter request race. Container scripts are now LF-enforced, Compose serves a Contact-specific frontend proxy, Contact E2E explicitly permits only that exact local origin, and the Inbox applies only the newest request result. No test was weakened.
 
 ## 9. Security fixes and evidence
 
@@ -166,7 +162,7 @@ See `SECURITY.md` for the threat model and `OUTBOUND_STATE_MACHINE.md` for deliv
 
 | # | Evidence |
 | --- | --- |
-| 1 | Temp Mode 111 unique API tests plus frontend build/unit evidence; full Docker wrapper remains the recorded host limitation. |
+| 1 | Temp Mode API/UI behavior passed inside the complete 196-test Compose regression, plus frontend build/unit evidence. |
 | 2 | capability unit tests and Contact API 403 matrix; Contact router/layout hides public UI. |
 | 3 | admin configuration unit/API/health tests; production bypass rejected. |
 | 4–5 | D1 Domain/Mailbox CRUD, normalization, fixed-address sync, default invariants, 50-Domain tests. |
@@ -183,13 +179,12 @@ See `SECURITY.md` for the threat model and `OUTBOUND_STATE_MACHINE.md` for deliv
 | 25 | Legacy direct-delete, bounded cleanup, scheduled cleanup, and operations cleanup preservation tests. |
 | 26 | numeric Contact migration versions 1–5 independent of upstream version; repeated migration evidence. |
 | 27 | business code isolated in Contact/provider/frontend Contact namespaces; hotspots remain thin. |
-| 28 | Worker 41/41/lint/build, frontend 67/67/build, Contact 32/32 + browser 2/2, Temp 111 unique; all-in-one Docker wrapper infrastructure-blocked before assertions. |
+| 28 | Worker 41/41/lint/build, frontend 67/67/build, Contact 32/32 + browser 2/2, Temp 111 unique, and full Compose 196/196. |
 | 29 | architecture/schema/state/security/provider/DNS/deployment/backup/recovery/rollback/upstream documents present. |
 | 30 | local Phase commits only; no production deployment or remote push. |
 
 ## 11. Known limitations and non-V1 scope
 
-- Final Compose/gzip/proxy/Legacy-browser orchestration awaits a healthy Docker daemon as described above.
 - V1 DNS is read-only and cannot prove provider-domain ownership without the provider's staging/production control plane.
 - R2 repair requires the bounded D1 raw fallback; an oversized message with an initial object-write failure needs the original source for full recovery.
 - Provider acceptance is not a delivery/read receipt. Unknown remains an explicit human risk decision.
@@ -203,7 +198,7 @@ Rollback prefers the previously recorded Worker/frontend revision while retainin
 
 ## 13. Upstream sync
 
-`main` remains the upstream mirror; reviewed upstream changes integrate into a temporary branch from `contact-hub`. Conflict hotspots are Worker route/middleware, Email entry, public settings, bindings/types, cleanup/scheduler, Legacy send, Admin mount, App/router/store/header/Admin, and shared API headers. Every sync must re-audit newly added public endpoints and rerun mode/security/provider/cleanup tests. See `UPSTREAM_SYNC.md`.
+`main` remains the upstream mirror. The first post-V1 synchronization reviewed and integrated `70206c6`, which adds single-mail read status. Temp Mode retains the upstream feature; Contact Mode reports the public-mailbox read-status capability as disabled and continues to use its private indexed state. The Email Worker still dispatches Contact ingress before Legacy raw-mail storage. Conflict hotspots and the repeatable process are documented in `UPSTREAM_SYNC.md`.
 
 ## 14. Manual actions not executed
 
@@ -212,7 +207,7 @@ Rollback prefers the previously recorded Worker/frontend revision while retainin
 - Verify provider Domains or call Resend/Brevo/real SMTP.
 - Configure Cloudflare Email Routing or MX/SPF/DKIM/DMARC.
 - Run staging/production migration, backup/restore, smoke, deployment, rollback, or DNS mutation.
-- Fetch/merge/push remote branches.
+- Push remote branches.
 
 ## 15. V2 suggestions (not implemented)
 

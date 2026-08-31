@@ -118,6 +118,19 @@ services:
       worker:
         condition: service_healthy
 
+  frontend-contact:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile.frontend
+    ports:
+      - "5174:5174"
+    environment:
+      VITE_WORKER_URL: http://worker-contact:8792
+    command: ["pnpm", "exec", "vite", "--port", "5174", "--host", "0.0.0.0"]
+    depends_on:
+      worker-contact:
+        condition: service_healthy
+
   smtp-proxy:
     build:
       context: ../smtp_proxy_server
@@ -168,6 +181,7 @@ services:
       WORKER_CONTACT_URL: http://worker-contact:8792
       CONTACT_ADMIN_PASSWORD: e2e-contact-admin
       FRONTEND_URL: https://frontend:5173
+      FRONTEND_CONTACT_URL: https://frontend-contact:5174
       MAILPIT_API: http://mailpit:8025/api
       SMTP_PROXY_HOST: smtp-proxy
       SMTP_PROXY_SMTP_PORT: "8025"
@@ -190,6 +204,8 @@ services:
       worker-contact:
         condition: service_healthy
       frontend:
+        condition: service_started
+      frontend-contact:
         condition: service_started
       smtp-proxy:
         condition: service_started

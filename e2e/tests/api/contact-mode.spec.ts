@@ -25,6 +25,8 @@ test.describe('Contact Mode capability gates', () => {
     expect(settings.randomSubdomainDomains).toEqual([]);
     expect(settings.domainLabels).toEqual([]);
     expect(settings.prefix).toBe('');
+    expect(settings.enableUserDeleteEmail).toBe(false);
+    expect(settings.enableMailReadStatus).toBe(false);
     expect(JSON.stringify(settings)).not.toContain('private-contact.example.com');
   });
 

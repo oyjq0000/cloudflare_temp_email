@@ -21,7 +21,8 @@ const instance = axios.create({
 });
 
 const apiFetch = async (path, options = {}) => {
-    loading.value = true;
+    const showLoading = options.showLoading !== false;
+    if (showLoading) loading.value = true;
     try {
         // Get browser fingerprint for request tracking
         const fingerprint = await getFingerprint();
@@ -71,7 +72,7 @@ const apiFetch = async (path, options = {}) => {
         }
         throw error;
     } finally {
-        loading.value = false;
+        if (showLoading) loading.value = false;
     }
 }
 
@@ -106,6 +107,7 @@ const getOpenSettings = async (message, notification) => {
             disableAnonymousUserCreateEmail: res["disableAnonymousUserCreateEmail"] || false,
             disableCustomAddressName: res["disableCustomAddressName"] || false,
             enableUserDeleteEmail: res["enableUserDeleteEmail"] || false,
+            enableMailReadStatus: res["enableMailReadStatus"] === true,
             enableAutoReply: res["enableAutoReply"] || false,
             enableIndexAbout: res["enableIndexAbout"] || false,
             copyright: res["copyright"] || openSettings.value.copyright,

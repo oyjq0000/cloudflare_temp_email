@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Linux container entrypoints must remain LF-only.
 set -euo pipefail
 
 CERT_DIR="/certs"

@@ -9,6 +9,7 @@ export const WORKER_GZIP_URL = process.env.WORKER_GZIP_URL || '';
 export const WORKER_URL_SEND_MAIL_DOMAIN = process.env.WORKER_URL_SEND_MAIL_DOMAIN || '';
 export const WORKER_CONTACT_URL = process.env.WORKER_CONTACT_URL || '';
 export const FRONTEND_URL = process.env.FRONTEND_URL!;
+export const FRONTEND_CONTACT_URL = process.env.FRONTEND_CONTACT_URL || '';
 export const MAILPIT_API = process.env.MAILPIT_API!;
 export const MAILPIT_SMTP_HOST = process.env.MAILPIT_SMTP_HOST || 'mailpit';
 export const TEST_DOMAIN = 'test.example.com';
@@ -29,10 +30,11 @@ export function hashPassword(password: string): string {
 export async function createTestAddress(
   ctx: APIRequestContext,
   name: string,
-  domain: string = TEST_DOMAIN
+  domain: string = TEST_DOMAIN,
+  workerUrl: string = WORKER_URL,
 ): Promise<{ jwt: string; address: string; address_id: number }> {
   const uniqueName = `${name}${Date.now()}`;
-  const res = await ctx.post(`${WORKER_URL}/api/new_address`, {
+  const res = await ctx.post(`${workerUrl}/api/new_address`, {
     data: { name: uniqueName, domain },
   });
   if (!res.ok()) {

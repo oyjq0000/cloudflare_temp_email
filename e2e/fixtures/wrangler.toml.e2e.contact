@@ -16,6 +16,7 @@ ENABLE_USER_DELETE_EMAIL = true
 DEFAULT_SEND_BALANCE = 10
 ADMIN_PASSWORDS = ["e2e-contact-admin"]
 DISABLE_ADMIN_PASSWORD_CHECK = false
+CONTACT_ALLOWED_ORIGINS = ["https://frontend-contact:5174"]
 E2E_TEST_MODE = true
 RESEND_TOKEN = "e2e-global-must-not-win"
 

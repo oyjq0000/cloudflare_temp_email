@@ -17,12 +17,16 @@
 - feat: |Contact Hub| 新增 Resend/Brevo/SMTP Provider contract、Registry、Secret Resolver、配置 CRUD/UI 和 Domain 显式 Provider 绑定，并保持 Legacy Provider 选择顺序
 - feat: |Contact Hub| 新增幂等出站状态机、原子领取、Attempts/Sent 审计、Failed 人工 Retry、Unknown Force Resend，以及 Compose/Reply/Sent UI
 - feat: |Contact Hub| 新增只读 MX/SPF/DKIM/DMARC 检查与缓存、运行健康面板、超时 Sending 调和，以及 Contact API 同源/允许列表 CORS
+- feat: |邮件| 新增可选的已读/未读状态，支持点击邮件自动已读和手动切换状态
 - feat: |Admin| 数据库页面新增 D1 存储容量展示，支持选择并保存 Free 或 Workers Paid 套餐，对比当前数据库大小和容量上限
 - feat: |Admin| 创建邮箱页面支持一键生成随机邮箱名称（issue #1126）
 - feat: |用户系统| 用户中心新增发送邮件、与收件箱一致的可按绑定地址过滤的发件箱，以及地址管理凭证弹框；提供使用用户 JWT 的地址设置、发信权限申请、发信及发件箱 API
 
 ### Bug Fixes
 
+- fix: |E2E| 强制 Linux 容器 Shell 入口脚本使用 LF 行尾，避免 Windows 检出后出现 `bash\r` / `pipefail\r` 启动失败
+- fix: |E2E| 为 Contact 浏览器套件增加独立的 Contact Worker 前端代理，避免全量 Compose 误用 Temp 前端触发模式重定向
+- fix: |Contact Hub| 收件箱并发筛选采用最新请求优先，避免初始加载覆盖用户筛选；浏览器回归同时校验筛选响应，并将独立 Contact 前端 Origin 加入本地写操作允许列表
 - fix: |Contact Hub| 阻止 Legacy 地址删除、收发件清空、定时 Cleanup 和 Contact Mode 自定义 SQL Cleanup 误删固定 Contact Mailbox
 - fix: |Contact Hub| Contact 入站在 D1 可靠落库前不再触发转发、AI、Telegram、Webhook 或 Auto Reply；R2 失败保留可见 D1 兜底并标记 degraded/fallback
 - fix: |Contact Hub| 统一邮件 HTML 消毒路径，默认阻止远程图片，并为 iframe、Shadow DOM、Sent 和 Telegram 渲染补齐脚本/主动内容隔离；危险附件强制二进制下载

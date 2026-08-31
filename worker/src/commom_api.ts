@@ -48,6 +48,8 @@ api.get('/open_api/settings', async (c) => {
         "disableCustomAddressName": utils.getBooleanValue(c.env.DISABLE_CUSTOM_ADDRESS_NAME),
         "enableUserDeleteEmail": capabilities.publicMailbox
             && utils.getBooleanValue(c.env.ENABLE_USER_DELETE_EMAIL),
+        "enableMailReadStatus": capabilities.publicMailbox
+            && utils.getBooleanValue(c.env.ENABLE_MAIL_READ_STATUS),
         "enableAutoReply": utils.getBooleanValue(c.env.ENABLE_AUTO_REPLY),
         "enableIndexAbout": utils.getBooleanValue(c.env.ENABLE_INDEX_ABOUT),
         "copyright": c.env.COPYRIGHT,

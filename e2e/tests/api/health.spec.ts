@@ -28,5 +28,6 @@ test.describe('Health & Settings', () => {
     expect(settings.enableSendMail).toBe(true);
     expect(settings.enableUserCreateEmail).toBe(true);
     expect(settings.enableUserDeleteEmail).toBe(true);
+    expect(settings.enableMailReadStatus).toBe(true);
   });
 });

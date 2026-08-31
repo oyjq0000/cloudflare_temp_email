@@ -1,13 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { FRONTEND_URL, WORKER_CONTACT_URL } from '../../fixtures/test-helpers';
+import { FRONTEND_CONTACT_URL, WORKER_CONTACT_URL } from '../../fixtures/test-helpers';
 
 const ADMIN_HEADERS = { 'x-admin-auth': 'e2e-contact-admin' };
 const run = Date.now();
 const subject = `Browser Contact Safety ${run}`;
 
 const signIn = async (page: Page) => {
-  await page.goto(`${FRONTEND_URL}/en/hub`);
+  await page.goto(`${FRONTEND_CONTACT_URL}/en/hub`);
   await expect(page.getByTestId('contact-login')).toBeVisible();
   await page.locator('.contact-login input[type="password"]').fill('e2e-contact-admin');
   await page.getByRole('button', { name: 'Open Contact Hub' }).click();
@@ -16,14 +16,28 @@ const signIn = async (page: Page) => {
 };
 
 const filterSubject = async (page: Page) => {
+  const messageRow = page.locator('.message-row', { hasText: subject });
   await page.getByPlaceholder('Subject').fill(subject);
+  const filteredResponsePromise = page.waitForResponse(response => {
+    const url = new URL(response.url());
+    return response.request().method() === 'GET'
+      && url.pathname === '/admin/contact/messages'
+      && url.searchParams.get('subject') === subject;
+  });
   await page.getByRole('button', { name: 'Filter' }).click();
-  await expect(page.locator('.message-row', { hasText: subject })).toBeVisible();
+  const filteredResponse = await filteredResponsePromise;
+  const payload = await filteredResponse.json();
+  expect(filteredResponse.ok(), JSON.stringify(payload)).toBe(true);
+  expect(payload.results.some((item: { subject: string }) => item.subject === subject)).toBe(true);
+  await expect(messageRow).toBeVisible();
 };
 
 test.describe.serial('Contact Hub browser safety', () => {
   test.beforeEach(() => {
-    test.skip(!WORKER_CONTACT_URL, 'WORKER_CONTACT_URL is not configured');
+    test.skip(
+      !WORKER_CONTACT_URL || !FRONTEND_CONTACT_URL,
+      'WORKER_CONTACT_URL and FRONTEND_CONTACT_URL are required',
+    );
     test.setTimeout(60_000);
   });
 
