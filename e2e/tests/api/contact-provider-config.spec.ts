@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import {
   MAILPIT_API,
+  MAILPIT_SMTP_HOST,
   WORKER_CONTACT_URL,
   deleteAllMailpitMessages,
   onMailpitMessage,
@@ -38,7 +39,7 @@ test.describe.serial('Contact Provider Config', () => {
       headers: ADMIN_HEADERS,
       data: {
         name: `Mailpit SMTP ${run}`, provider_type: 'smtp',
-        config: { host: 'mailpit', port: 1025, secure: false, starttls: false },
+        config: { host: MAILPIT_SMTP_HOST, port: 1025, secure: false, starttls: false },
         secret_refs: {},
       },
     });

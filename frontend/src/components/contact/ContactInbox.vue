@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { contactApi } from '../../api/contact'
+import { safeDownloadFilename } from '../../utils/download-filename'
 import { useIsMobile } from '../../utils/composables'
 import ContactMailHtml from './ContactMailHtml.vue'
 import ContactCompose from './ContactCompose.vue'
@@ -119,7 +120,7 @@ const downloadRaw = async () => {
   catch (error) { notification.error(error.message) }
 }
 const downloadAttachment = async (attachment) => {
-  try { saveBlob(await contactApi.downloadAttachment(attachment.id), attachment.filename || 'attachment') }
+  try { saveBlob(await contactApi.downloadAttachment(attachment.id), safeDownloadFilename(attachment.filename)) }
   catch (error) { notification.error(error.message) }
 }
 
@@ -185,7 +186,7 @@ onMounted(async () => {
                 <n-button size="small" @click="downloadRaw">{{ copy.raw }}</n-button>
               </n-space>
             </header>
-            <div v-if="selected.attachments?.length" class="attachments"><strong>{{ copy.attachments }}</strong><n-button v-for="attachment in selected.attachments" :key="attachment.id" size="tiny" @click="downloadAttachment(attachment)">{{ attachment.filename }} · {{ attachment.size }} B</n-button></div>
+            <div v-if="selected.attachments?.length" class="attachments"><strong>{{ copy.attachments }}</strong><n-button v-for="attachment in selected.attachments" :key="attachment.id" size="tiny" @click="downloadAttachment(attachment)">{{ safeDownloadFilename(attachment.filename) }} · {{ attachment.size }} B</n-button></div>
             <ContactMailHtml v-if="selected.html_body" :message-id="selected.id" :html="selected.html_body" />
             <pre v-else-if="selected.text_body" class="text-body">{{ selected.text_body }}</pre>
             <n-empty v-else :description="copy.bodyUnavailable" />
@@ -204,7 +205,7 @@ onMounted(async () => {
             <n-button size="small" @click="updateSelected(selected.folder === 'spam' ? contactApi.markNotSpam : contactApi.markSpam)">{{ selected.folder === 'spam' ? copy.notSpam : copy.spam }}</n-button>
             <n-button size="small" @click="downloadRaw">{{ copy.raw }}</n-button>
           </n-space>
-          <div v-if="selected.attachments?.length" class="attachments"><strong>{{ copy.attachments }}</strong><n-button v-for="attachment in selected.attachments" :key="attachment.id" size="tiny" @click="downloadAttachment(attachment)">{{ attachment.filename }}</n-button></div>
+          <div v-if="selected.attachments?.length" class="attachments"><strong>{{ copy.attachments }}</strong><n-button v-for="attachment in selected.attachments" :key="attachment.id" size="tiny" @click="downloadAttachment(attachment)">{{ safeDownloadFilename(attachment.filename) }}</n-button></div>
           <ContactMailHtml v-if="selected.html_body" :message-id="selected.id" :html="selected.html_body" />
           <pre v-else class="text-body">{{ selected.text_body || copy.bodyUnavailable }}</pre>
         </template>

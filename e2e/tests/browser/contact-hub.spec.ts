@@ -1,0 +1,106 @@
+import { expect, test, type Page } from '@playwright/test';
+
+import { FRONTEND_URL, WORKER_CONTACT_URL } from '../../fixtures/test-helpers';
+
+const ADMIN_HEADERS = { 'x-admin-auth': 'e2e-contact-admin' };
+const run = Date.now();
+const subject = `Browser Contact Safety ${run}`;
+
+const signIn = async (page: Page) => {
+  await page.goto(`${FRONTEND_URL}/en/hub`);
+  await expect(page.getByTestId('contact-login')).toBeVisible();
+  await page.locator('.contact-login input[type="password"]').fill('e2e-contact-admin');
+  await page.getByRole('button', { name: 'Open Contact Hub' }).click();
+  await expect(page.getByRole('heading', { name: 'Private Contact Mail Hub' })).toBeVisible();
+  await expect(page.getByTestId('contact-login')).toBeHidden();
+};
+
+const filterSubject = async (page: Page) => {
+  await page.getByPlaceholder('Subject').fill(subject);
+  await page.getByRole('button', { name: 'Filter' }).click();
+  await expect(page.locator('.message-row', { hasText: subject })).toBeVisible();
+};
+
+test.describe.serial('Contact Hub browser safety', () => {
+  test.beforeEach(() => {
+    test.skip(!WORKER_CONTACT_URL, 'WORKER_CONTACT_URL is not configured');
+    test.setTimeout(60_000);
+  });
+
+  test.beforeAll(async ({ request }) => {
+    if (!WORKER_CONTACT_URL) return;
+    await request.post(`${WORKER_CONTACT_URL}/admin/contact/db/migrate`, { headers: ADMIN_HEADERS });
+    const domain = (await (await request.post(`${WORKER_CONTACT_URL}/admin/contact/domains`, {
+      headers: ADMIN_HEADERS,
+      data: { domain: `browser-${run}.example.com`, name: 'Browser safety' },
+    })).json()).result;
+    const mailbox = (await (await request.get(
+      `${WORKER_CONTACT_URL}/admin/contact/mailboxes?domain_id=${domain.id}`,
+      { headers: ADMIN_HEADERS },
+    )).json()).results[0];
+    const raw = [
+      'From: Browser Sender <browser.sender@example.net>', `To: ${mailbox.address}`,
+      `Subject: ${subject}`, `Message-ID: <browser-${run}@example.net>`, 'MIME-Version: 1.0',
+      'Content-Type: multipart/mixed; boundary="browser-boundary"', '',
+      '--browser-boundary', 'Content-Type: text/html; charset=utf-8', '',
+      '<p id="safe-copy" onclick="alert(1)">Safe browser body</p><script>alert(2)</script><img src="https://tracker.example/pixel.gif">',
+      '--browser-boundary', 'Content-Type: image/svg+xml; name="../browser.svg"',
+      'Content-Disposition: attachment; filename="../browser.svg"', 'Content-Transfer-Encoding: base64', '',
+      'PHN2ZyBvbmxvYWQ9ImFsZXJ0KDEpIj48L3N2Zz4=', '--browser-boundary--',
+    ].join('\r\n');
+    const received = await request.post(`${WORKER_CONTACT_URL}/admin/test/receive_mail`, {
+      headers: ADMIN_HEADERS, data: { from: 'browser.sender@example.net', to: mailbox.address, raw },
+    });
+    expect(received.ok(), await received.text()).toBe(true);
+  });
+
+  test('uses the mobile full-width message drawer', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await signIn(page);
+    await filterSubject(page);
+    await page.locator('.message-row', { hasText: subject }).click();
+    await expect(page.locator('.n-drawer')).toBeVisible();
+    await expect(page.locator('.n-drawer').getByText(subject)).toBeVisible();
+  });
+
+  test('signs in, renders safe HTML, opts into remote images, and downloads safely', async ({ page }) => {
+    let remoteRequests = 0;
+    await page.route('https://tracker.example/**', async route => {
+      remoteRequests += 1;
+      await route.fulfill({ status: 204, body: '' });
+    });
+    await signIn(page);
+    await filterSubject(page);
+    await page.locator('.message-row', { hasText: subject }).click();
+    await expect(page.locator('.message-detail h2')).toHaveText(subject);
+    await expect(page.getByText(/remote resources blocked/)).toBeVisible();
+    expect(remoteRequests).toBe(0);
+
+    const unsafeBefore = await page.locator('.contact-html').evaluate(element => {
+      const host = [...element.querySelectorAll('div')].find(node => node.shadowRoot);
+      return {
+        scripts: host?.shadowRoot?.querySelectorAll('script').length || 0,
+        handlers: host?.shadowRoot?.querySelectorAll('[onclick]').length || 0,
+        remoteImages: host?.shadowRoot?.querySelectorAll('img[src^="http"]').length || 0,
+      };
+    });
+    expect(unsafeBefore).toEqual({ scripts: 0, handlers: 0, remoteImages: 0 });
+
+    await page.getByRole('button', { name: 'Load remote images' }).click();
+    await expect.poll(() => remoteRequests).toBe(1);
+    const attachmentButton = page.getByRole('button', { name: /browser\.svg/ });
+    await expect(attachmentButton).toContainText('browser.svg');
+    await expect(attachmentButton).not.toContainText('..');
+    await attachmentButton.click({ noWaitAfter: true });
+
+    await page.locator('.message-detail').getByRole('button', { name: 'Move to spam' }).click();
+    await page.locator('.hub-sidebar').getByRole('button', { name: /Spam/ }).click();
+    await filterSubject(page);
+    await page.locator('.message-row', { hasText: subject }).click();
+    await page.locator('.message-detail').getByRole('button', { name: 'Not spam' }).click();
+
+    await page.locator('.hub-sidebar nav').last().getByRole('button', { name: 'Operations' }).click();
+    await expect(page.getByText('Operations health & DNS')).toBeVisible();
+    await expect(page.getByText('Healthy')).toBeVisible();
+  });
+});

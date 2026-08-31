@@ -189,4 +189,61 @@ const contactProviderSend = async (c: Context<HonoCustomType>) => {
     }
 }
 
-export default { seedMail, receiveMail, contactMessage, contactProviderSend };
+const contactPerformanceSeed = async (c: Context<HonoCustomType>) => {
+    if (!getBooleanValue(c.env.E2E_TEST_MODE)) return c.text('Not available', 404)
+    const input = await c.req.json<{ mailbox_ids?: unknown, messages_per_mailbox?: unknown }>()
+    if (!Array.isArray(input.mailbox_ids) || input.mailbox_ids.length < 1 || input.mailbox_ids.length > 100) {
+        return c.text('mailbox_ids must contain 1 to 100 ids', 400)
+    }
+    const mailboxIds = input.mailbox_ids.map(Number)
+    if (mailboxIds.some(id => !Number.isInteger(id) || id < 1) || new Set(mailboxIds).size !== mailboxIds.length) {
+        return c.text('mailbox_ids are invalid', 400)
+    }
+    const messagesPerMailbox = Number(input.messages_per_mailbox)
+    const total = mailboxIds.length * messagesPerMailbox
+    if (!Number.isInteger(messagesPerMailbox) || messagesPerMailbox < 1 || total > 2_000) {
+        return c.text('messages_per_mailbox is invalid', 400)
+    }
+    const placeholders = mailboxIds.map(() => '?').join(', ')
+    const { results } = await c.env.DB.prepare(`
+        SELECT id, domain_id, address FROM contact_mailboxes WHERE id IN (${placeholders})
+    `).bind(...mailboxIds).all<{ id: number, domain_id: number, address: string }>()
+    if ((results || []).length !== mailboxIds.length) return c.text('mailbox was not found', 404)
+    const byId = new Map((results || []).map(row => [row.id, row]))
+    const started = Date.now()
+    const baseId = -(Date.now() * 1_000 + Math.floor(Math.random() * 500))
+    const statements: D1PreparedStatement[] = []
+    let index = 0
+    for (const mailboxId of mailboxIds) {
+        const mailbox = byId.get(mailboxId)!
+        for (let offset = 0; offset < messagesPerMailbox; offset += 1) {
+            const rawMailId = baseId - index
+            const unique = `performance-${crypto.randomUUID()}`
+            const subject = `Performance seed ${String(index).padStart(4, '0')}`
+            const raw = `From: perf@example.net\r\nTo: ${mailbox.address}\r\nSubject: ${subject}\r\n\r\nIndexed body`
+            statements.push(c.env.DB.prepare(`
+                INSERT INTO raw_mails(id, message_id, source, address, raw, created_at)
+                VALUES (?, ?, 'perf@example.net', ?, ?, CURRENT_TIMESTAMP)
+            `).bind(rawMailId, `<${unique}@example.net>`, mailbox.address, raw))
+            statements.push(c.env.DB.prepare(`
+                INSERT INTO contact_messages(
+                    raw_mail_id, domain_id, mailbox_id, envelope_from, from_address,
+                    to_address, subject, preview, text_body, message_id_header,
+                    dedupe_key, raw_storage_key, storage_status, parse_status
+                ) VALUES (?, ?, ?, 'perf@example.net', 'perf@example.net', ?, ?,
+                    'Indexed body', 'Indexed body', ?, ?, ?, 'fallback', 'parsed')
+            `).bind(
+                rawMailId, mailbox.domain_id, mailbox.id, mailbox.address, subject,
+                `<${unique}@example.net>`, unique, `contact/performance/${unique}/raw.eml`,
+            ))
+            index += 1
+        }
+    }
+    for (let offset = 0; offset < statements.length; offset += 80) {
+        const batch = await c.env.DB.batch(statements.slice(offset, offset + 80))
+        if (!batch.every(result => result.success)) return c.text('performance seed failed', 500)
+    }
+    return c.json({ ok: true, domains: mailboxIds.length, messages: total, elapsedMs: Date.now() - started })
+}
+
+export default { seedMail, receiveMail, contactMessage, contactProviderSend, contactPerformanceSeed };

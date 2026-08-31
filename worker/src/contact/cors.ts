@@ -5,6 +5,18 @@ export type ContactCorsDecision = {
     origin?: string
 }
 
+export const CONTACT_CORS_ALLOWED_HEADERS = [
+    'Content-Type',
+    'Authorization',
+    'X-Admin-Auth',
+    'X-User-Token',
+    'X-User-Access-Token',
+    'X-Custom-Auth',
+    'X-Fingerprint',
+    'Idempotency-Key',
+    'X-Lang',
+].join(', ')
+
 const normalizedOrigin = (value: string): string | null => {
     try {
         const url = new URL(value)
@@ -65,7 +77,7 @@ export const contactCors = (): MiddlewareHandler<HonoCustomType> => async (c, ne
         c.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
         c.header(
             'Access-Control-Allow-Headers',
-            'Content-Type, X-Admin-Auth, X-User-Access-Token, Idempotency-Key, X-Lang',
+            CONTACT_CORS_ALLOWED_HEADERS,
         )
         c.header('Access-Control-Max-Age', '600')
         return c.body(null, 204)

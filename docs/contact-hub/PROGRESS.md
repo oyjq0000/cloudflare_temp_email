@@ -84,7 +84,7 @@
 ## Phase 7
 
 - Status: completed.
-- Commit: `feat(contact-ops): add dns health and safety controls` (hash recorded in the Phase 8 update after commit creation).
+- Commit: `fa2ea94` (`feat(contact-ops): add dns health and safety controls`).
 - Files: migration 5 and `contact_dns_checks`; Cloudflare DNS-over-HTTPS resolver; pure MX/SPF/DKIM/DMARC evaluation; explicit DKIM selector and expected-record support; cached/manual-refresh APIs and UI; Contact-only same-origin/allowlist CORS; classified Provider diagnostics; database/storage/security/count health API and dashboard; and manual stale-Sending reconciliation.
 - Tests: Worker 40/40; Worker lint pass; explicit Worker dry-run build pass; Frontend 65/65; Frontend production build pass; Compose configuration pass; Playwright discovery 189 tests in 49 files. Local Contact Wrangler suites passed 28 and skipped the two Docker-Mailpit cases. The four new operations cases prove explicit DKIM selector enforcement, MX/SPF/DKIM/DMARC cache behavior, SPF multiple-record Invalid, DNS transport failure Unknown, no second-SPF suggestion, untrusted-Origin 403, same-origin/preflight headers, stale Sending to Unknown without a second Attempt, redacted health, and Legacy mail Cleanup preservation.
 - Decisions: DNS is read-only and uses maintainable API-supplied requirements instead of scattered Provider constants. DKIM queries only the administrator-supplied selector. Contact CORS is isolated from Legacy CORS and never accepts wildcard origins. Provider exceptions and response bodies are not persisted; diagnostic fields are classified and generic. Reconciliation closes stale Attempts and intents as Unknown without invoking a Provider.
@@ -92,7 +92,19 @@
 
 ## Phase 8
 
-- Status: pending.
+- Status: implementation and every host-executable mock/local gate completed; the single Docker Compose orchestration command is host-infrastructure blocked before container startup.
+- Commits: implementation/test commit pending creation; final documentation closure follows it.
+- Files: E2E-only guarded bulk seed; 50-Domain/1,000-message and attachment-footprint API tests; Contact browser security/mobile test; portable host/Docker Mailpit hostname support; client filename sanitization; rendered remote-image consent fix; complete CORS frontend-header allowlist; `SECURITY.md`, `DEPLOYMENT.md`, `UPSTREAM_SYNC.md`, and `FINAL_REPORT.md`.
+- Tests:
+  - Worker: 41/41; lint pass; Wrangler dry-run build pass (no deployment).
+  - Frontend: 67/67 in 5 files; production build pass with only the existing large-chunk warning.
+  - Contact API: 32/32 against an isolated local Wrangler, D1, R2, injected HTTP providers, and local Mailpit. This includes both SMTP wire assertions.
+  - Contact browser: 2/2 in Chromium against an isolated Contact database. The test proves verified login, mobile full-width drawer, server filtering, safe HTML, default remote blocking, explicit remote consent, sanitized SVG filename, Spam round trip, and Operations health.
+  - Performance: 50 Domains and 1,000 messages seeded; 100-row page measured 50,422 UTF-8 bytes/202 ms with no body fields; 32-byte plus 512-KiB attachment list measured 1,076 bytes with no attachment payload.
+  - Temp API: 111 unique tests have passing evidence. The broad reused-state run passed 106; two Cleanup cases passed 2/2 on a fresh D1; the dedicated SEND_MAIL topology passed 18/18, including the three binding cases missing from the broad topology. SMTP tests used local Mailpit only.
+  - Compose config: pass. Full `npm test`/`docker compose up` cannot start because `npipe:////./pipe/dockerDesktopLinuxEngine` does not exist on this host. No assertion failed in that command because no container started.
+- Decisions: the performance seed endpoint is limited to 100 Mailboxes/2,000 messages, administrator protected, and returns 404 without `E2E_TEST_MODE`. Browser discovery found and fixed an actual cross-origin preflight gap (`X-Fingerprint` and existing auth headers) and a Naive UI alert-slot incompatibility. Host Mailpit accepts `MAILPIT_SMTP_HOST`; Docker keeps the default `mailpit` service hostname.
+- Remaining validation limitation: the all-in-one Docker run, gzip Worker project, SMTP/IMAP proxy containers, and the legacy browser suite still require a working Docker Desktop Linux daemon. All Contact V1 behavior and the complete Temp API set were executed without real credentials or production resources; the exact manual follow-up is in `FINAL_REPORT.md`.
 
 ## Manual production actions
 

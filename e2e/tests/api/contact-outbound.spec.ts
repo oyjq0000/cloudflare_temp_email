@@ -2,6 +2,7 @@ import { expect, test, type APIRequestContext } from '@playwright/test';
 
 import {
   MAILPIT_API,
+  MAILPIT_SMTP_HOST,
   WORKER_CONTACT_URL,
   deleteAllMailpitMessages,
   onMailpitMessage,
@@ -194,7 +195,7 @@ test.describe.serial('Contact outbound state machine', () => {
     test.skip(!MAILPIT_API, 'Mailpit is not configured outside the Docker E2E environment');
     const smtpProvider = (await (await post(request, '/admin/contact/providers', ADMIN_HEADERS, {
       name: `Reply Mailpit ${run}`, provider_type: 'smtp',
-      config: { host: 'mailpit', port: 1025, secure: false, starttls: false }, secret_refs: {},
+      config: { host: MAILPIT_SMTP_HOST, port: 1025, secure: false, starttls: false }, secret_refs: {},
     })).json()).result;
     const mailpitDomain = (await (await post(request, '/admin/contact/domains', ADMIN_HEADERS, {
       domain: `reply-mailpit-${run}.example.com`, name: 'Reply Mailpit',

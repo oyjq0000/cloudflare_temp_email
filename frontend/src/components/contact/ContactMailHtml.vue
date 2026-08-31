@@ -28,8 +28,10 @@ watch(() => props.messageId, () => { allowRemote.value = false })
 <template>
   <div class="contact-html">
     <n-alert v-if="!allowRemote && blocked.blocked" type="info" :show-icon="false">
-      {{ copy.blocked }}
-      <template #action><n-button text type="primary" @click="allowRemote = true">{{ copy.load }}</n-button></template>
+      <div class="remote-consent">
+        <span>{{ copy.blocked }}</span>
+        <n-button text type="primary" @click="allowRemote = true">{{ copy.load }}</n-button>
+      </div>
     </n-alert>
     <ShadowHtmlComponent
       :html-content="html"
@@ -40,4 +42,5 @@ watch(() => props.messageId, () => { allowRemote.value = false })
 
 <style scoped>
 .contact-html { display: grid; gap: 14px; overflow-wrap: anywhere; }
+.remote-consent { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 </style>

@@ -10,6 +10,7 @@ export const WORKER_URL_SEND_MAIL_DOMAIN = process.env.WORKER_URL_SEND_MAIL_DOMA
 export const WORKER_CONTACT_URL = process.env.WORKER_CONTACT_URL || '';
 export const FRONTEND_URL = process.env.FRONTEND_URL!;
 export const MAILPIT_API = process.env.MAILPIT_API!;
+export const MAILPIT_SMTP_HOST = process.env.MAILPIT_SMTP_HOST || 'mailpit';
 export const TEST_DOMAIN = 'test.example.com';
 
 /**

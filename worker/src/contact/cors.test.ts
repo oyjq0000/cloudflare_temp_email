@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { contactCorsDecision, parseContactAllowedOrigins } from './cors.ts'
+import { CONTACT_CORS_ALLOWED_HEADERS, contactCorsDecision, parseContactAllowedOrigins } from './cors.ts'
 
 test('Contact CORS allows same-origin and explicit allowlist origins only', () => {
     const configured = '["https://mail.example.com","https://admin.example.com"]'
@@ -20,4 +20,12 @@ test('Contact CORS permits non-browser clients without Origin and rejects wildca
 
 test('Contact CORS rejects configured paths and credential-bearing origins', () => {
     assert.deepEqual(parseContactAllowedOrigins('["https://mail.example/path","https://u:p@mail.example"]'), [])
+})
+
+test('Contact CORS permits every authentication and telemetry header sent by the frontend', () => {
+    const allowed = new Set(CONTACT_CORS_ALLOWED_HEADERS.toLowerCase().split(', '))
+    for (const header of [
+        'content-type', 'authorization', 'x-admin-auth', 'x-user-token',
+        'x-user-access-token', 'x-custom-auth', 'x-fingerprint', 'idempotency-key', 'x-lang',
+    ]) assert.equal(allowed.has(header), true, header)
 })
