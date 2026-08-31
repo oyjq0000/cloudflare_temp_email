@@ -21,6 +21,14 @@ Migrations execute in numeric order, skip recorded versions, and record a versio
 
 The runner is idempotent and must not drop or rewrite `raw_mails`, `address`, `sendbox`, `settings`, or upstream version data.
 
+Implemented migration versions:
+
+| Version | Name | Tables/indexes |
+| --- | --- | --- |
+| 1 | `contact_domain_mailbox_provider_core` | `contact_domains`, `contact_mailboxes`, `contact_provider_configs`, their lookup indexes, and the one-default-Mailbox partial unique index |
+
+The authenticated endpoints are `GET /admin/contact/db/version` and `POST /admin/contact/db/migrate`. Running the latter repeatedly is a no-op after version 1 has been recorded.
+
 ## Core entities
 
 ### `contact_domains`
@@ -40,6 +48,7 @@ Invariants:
 - A mailbox address cannot cross its parent domain.
 - A domain has at most one default mailbox.
 - Contact-owned upstream addresses are protected from legacy delete and cleanup.
+- The first Mailbox for a Domain is always its default; a current default cannot be disabled until another Mailbox is selected.
 - Disabling does not delete messages or outbound history.
 
 ### `contact_provider_configs`

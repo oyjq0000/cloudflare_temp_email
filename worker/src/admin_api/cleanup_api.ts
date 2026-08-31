@@ -6,6 +6,7 @@ import { getJsonSetting, saveSetting } from '../utils';
 import { CleanupSettings, CustomSqlCleanup } from '../models';
 import i18n from '../i18n';
 import { LocaleMessages } from '../i18n/type';
+import { resolveAppMode } from '../app_mode';
 
 // SQL validation error types
 type SqlValidationError = 'empty' | 'too_long' | 'not_delete' | 'multiple_statements' | 'has_comments';
@@ -69,6 +70,12 @@ export const executeCustomSqlCleanup = async (
     customSql: CustomSqlCleanup
 ): Promise<{ success: boolean; rowsAffected?: number; error?: string }> => {
     const msgs = i18n.getMessagesbyContext(c);
+    if (resolveAppMode(c.env) === 'contact') {
+        return {
+            success: false,
+            error: 'CONTACT_CUSTOM_SQL_CLEANUP_DISABLED',
+        }
+    }
     if (!customSql || !customSql.sql) {
         return { success: false, error: msgs.InvalidCleanupConfigMsg };
     }
@@ -112,6 +119,19 @@ export default {
     saveCleanup: async (c: Context<HonoCustomType>) => {
         const msgs = i18n.getMessagesbyContext(c);
         const cleanupSetting = await c.req.json<CleanupSettings>();
+
+        if (
+            resolveAppMode(c.env) === 'contact'
+            && cleanupSetting.customSqlCleanupList?.some(item => Boolean(item.sql?.trim()))
+        ) {
+            return c.json({
+                ok: false,
+                error: {
+                    code: 'CONTACT_CUSTOM_SQL_CLEANUP_DISABLED',
+                    message: 'Custom SQL cleanup is disabled in Contact Mode',
+                },
+            }, 409)
+        }
 
         // Validate custom SQL cleanup list
         if (cleanupSetting.customSqlCleanupList && cleanupSetting.customSqlCleanupList.length > 0) {

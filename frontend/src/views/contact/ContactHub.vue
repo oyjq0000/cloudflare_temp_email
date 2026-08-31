@@ -6,6 +6,9 @@ import { useRouter } from 'vue-router'
 import { api } from '../../api'
 import { useGlobalState } from '../../store'
 import ContactLogin from './ContactLogin.vue'
+import DomainManager from '../../components/contact/DomainManager.vue'
+import MailboxManager from '../../components/contact/MailboxManager.vue'
+import { contactApi } from '../../api/contact'
 
 const { openSettings, userSettings } = useGlobalState()
 const { locale } = useI18n({ useScope: 'global' })
@@ -13,11 +16,17 @@ const router = useRouter()
 const status = ref(null)
 const authorized = ref(false)
 const loadingStatus = ref(false)
+const migration = ref(null)
+const migrating = ref(false)
+const activeSection = ref('domains')
 
 const copy = computed(() => locale.value === 'zh' ? {
   title: 'Private Contact Mail Hub',
   subtitle: '统一管理多个网站的固定联系邮箱',
-  ready: '私有入口与能力封锁已启用。Inbox、Domain 与 Provider 管理将在后续阶段接入。',
+  migrationTitle: 'Contact 数据库需要初始化',
+  migrationBody: '迁移只创建独立的 contact_* 表，不修改上游 db_version。',
+  migrate: '执行 Contact Migration',
+  domains: 'Domains', mailboxes: 'Mailboxes', inbox: 'Inbox', inboxPending: 'Unified Inbox 将在 Phase 4 接入。',
   advanced: '高级管理',
   logout: '退出',
   securityOk: '管理员安全配置有效',
@@ -25,7 +34,10 @@ const copy = computed(() => locale.value === 'zh' ? {
 } : {
   title: 'Private Contact Mail Hub',
   subtitle: 'One private inbox for fixed mailboxes across your sites',
-  ready: 'The private entry point and capability gates are active. Inbox, Domain, and Provider management are added in subsequent phases.',
+  migrationTitle: 'Contact database initialization required',
+  migrationBody: 'The migration only creates independent contact_* tables and does not modify the upstream db_version.',
+  migrate: 'Run Contact Migration',
+  domains: 'Domains', mailboxes: 'Mailboxes', inbox: 'Inbox', inboxPending: 'Unified Inbox is added in Phase 4.',
   advanced: 'Advanced admin',
   logout: 'Sign out',
   securityOk: 'Administrator security is configured',
@@ -42,11 +54,21 @@ const loadStatus = async () => {
   loadingStatus.value = true
   try {
     status.value = await api.fetch('/admin/contact/status')
+    migration.value = await contactApi.getMigrationStatus()
     authorized.value = true
   } catch {
     authorized.value = false
   } finally {
     loadingStatus.value = false
+  }
+}
+
+const migrate = async () => {
+  migrating.value = true
+  try {
+    migration.value = await contactApi.migrate()
+  } finally {
+    migrating.value = false
   }
 }
 
@@ -57,6 +79,7 @@ const signOut = () => {
   userSettings.value.is_admin = false
   authorized.value = false
   status.value = null
+  migration.value = null
 }
 
 onMounted(async () => {
@@ -88,9 +111,16 @@ onMounted(async () => {
       </header>
       <main class="contact-main">
         <n-alert :type="securityType" :title="securityText" />
-        <n-card class="phase-card">
-          <n-empty :description="copy.ready" />
+        <n-card v-if="migration?.pending?.length" class="migration-card">
+          <n-result status="warning" :title="copy.migrationTitle" :description="copy.migrationBody">
+            <template #footer><n-button type="primary" :loading="migrating" @click="migrate">{{ copy.migrate }}</n-button></template>
+          </n-result>
         </n-card>
+        <n-tabs v-else v-model:value="activeSection" type="segment" animated>
+          <n-tab-pane name="domains" :tab="copy.domains"><DomainManager /></n-tab-pane>
+          <n-tab-pane name="mailboxes" :tab="copy.mailboxes"><MailboxManager /></n-tab-pane>
+          <n-tab-pane name="inbox" :tab="copy.inbox"><n-card><n-empty :description="copy.inboxPending" /></n-card></n-tab-pane>
+        </n-tabs>
       </main>
     </template>
   </div>
@@ -125,7 +155,7 @@ onMounted(async () => {
   padding: clamp(20px, 4vw, 56px);
 }
 
-.phase-card {
+.migration-card {
   min-height: 360px;
   display: grid;
   place-items: center;

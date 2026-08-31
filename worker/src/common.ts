@@ -7,6 +7,11 @@ import { unbindTelegramByAddress } from './telegram_api/common';
 import { CONSTANTS } from './constants';
 import { AddressCreationSettings, AdminWebhookSettings, ExtractResult, WebhookMail, WebhookSettings } from './models';
 import i18n from './i18n';
+import {
+    isContactMailboxAddressId,
+    protectLegacyAddressCondition,
+    protectLegacyMessageSelection,
+} from './contact/mailboxes/protection';
 
 const DEFAULT_NAME_REGEX = /[^a-z0-9]/g;
 const DEFAULT_RANDOM_SUBDOMAIN_LENGTH = 8;
@@ -527,15 +532,22 @@ export const cleanup = async (
             )
             break;
         case "mails":
+            {
+            const selection = await protectLegacyMessageSelection(
+                c.env.DB,
+                'raw_mails',
+                `created_at < datetime('now', ?)`,
+            )
             await c.env.DB.prepare(`
                 DELETE FROM raw_mails WHERE id IN (
                     SELECT id FROM raw_mails
-                    WHERE created_at < datetime('now', ?)
+                    WHERE ${selection}
                     ORDER BY created_at, id
                     LIMIT ?
                 )`
             ).bind(`-${cleanDays} day`, cleanupBatchSize).run();
             break;
+            }
         case "mails_unknow":
             await c.env.DB.prepare(`
                 DELETE FROM raw_mails WHERE address NOT IN
@@ -543,15 +555,22 @@ export const cleanup = async (
             ).run();
             break;
         case "sendbox":
+            {
+            const selection = await protectLegacyMessageSelection(
+                c.env.DB,
+                'sendbox',
+                `created_at < datetime('now', ?)`,
+            )
             await c.env.DB.prepare(`
                 DELETE FROM sendbox WHERE id IN (
                     SELECT id FROM sendbox
-                    WHERE created_at < datetime('now', ?)
+                    WHERE ${selection}
                     ORDER BY created_at, id
                     LIMIT ?
                 )`
             ).bind(`-${cleanDays} day`, cleanupBatchSize).run();
             break;
+            }
         case "emptyAddress":
             // Delete addresses that have no emails and were created more than N days ago
             await batchDeleteAddressWithData(
@@ -569,6 +588,7 @@ const batchDeleteAddressWithData = async (
     c: Context<HonoCustomType>,
     addressQueryCondition: string,
 ): Promise<boolean> => {
+    addressQueryCondition = await protectLegacyAddressCondition(c.env.DB, addressQueryCondition)
     await c.env.DB.prepare(
         `DELETE FROM raw_mails WHERE address IN ( ` +
         `SELECT name FROM address WHERE ${addressQueryCondition})`
@@ -622,6 +642,9 @@ export const deleteAddressWithData = async (
     // check address again
     if (!address || !address_id) {
         throw new Error(msgs.AddressNotFoundMsg);
+    }
+    if (await isContactMailboxAddressId(c.env.DB, address_id)) {
+        throw new Error('CONTACT_MAILBOX_PROTECTED')
     }
     // unbind telegram
     await unbindTelegramByAddress(c, address);

@@ -4,6 +4,15 @@ import { Jwt } from 'hono/utils/jwt'
 import i18n from '../i18n'
 import { getBooleanValue } from '../utils'
 import { newAddress, handleListQuery } from '../common'
+import { isContactMailboxAddressId } from '../contact/mailboxes/protection'
+
+const contactMailboxProtected = (c: Context<HonoCustomType>) => c.json({
+    ok: false,
+    error: {
+        code: 'CONTACT_MAILBOX_PROTECTED',
+        message: 'Contact Mailboxes must be managed through Contact Hub',
+    },
+}, 409)
 
 const listAddresses = async (c: Context<HonoCustomType>) => {
     const { limit, offset, query, sort_by, sort_order } = c.req.query();
@@ -70,6 +79,7 @@ const createNewAddress = async (c: Context<HonoCustomType>) => {
 const deleteAddress = async (c: Context<HonoCustomType>) => {
     const msgs = i18n.getMessagesbyContext(c);
     const { id } = c.req.param();
+    if (await isContactMailboxAddressId(c.env.DB, id)) return contactMailboxProtected(c)
     // single batch runs as one transaction: rows keyed by address name are
     // deleted first and the address row last, so the name subqueries still
     // resolve and a failed statement rolls back the whole deletion
@@ -107,6 +117,7 @@ const deleteAddress = async (c: Context<HonoCustomType>) => {
 const clearInbox = async (c: Context<HonoCustomType>) => {
     const msgs = i18n.getMessagesbyContext(c);
     const { id } = c.req.param();
+    if (await isContactMailboxAddressId(c.env.DB, id)) return contactMailboxProtected(c)
     const { success: mailSuccess } = await c.env.DB.prepare(
         `DELETE FROM raw_mails WHERE address IN`
         + ` (select name from address where id = ?) `
@@ -120,6 +131,7 @@ const clearInbox = async (c: Context<HonoCustomType>) => {
 const clearSentItems = async (c: Context<HonoCustomType>) => {
     const msgs = i18n.getMessagesbyContext(c);
     const { id } = c.req.param();
+    if (await isContactMailboxAddressId(c.env.DB, id)) return contactMailboxProtected(c)
     const { success: sendboxSuccess } = await c.env.DB.prepare(
         `DELETE FROM sendbox WHERE address IN`
         + ` (select name from address where id = ?) `
