@@ -12,12 +12,13 @@ CREATE TABLE contact_schema_migrations (
 );
 ```
 
-Migrations execute in numeric order, skip recorded versions, and record a version only after all statements for it succeed. They must be safe on both an empty database and the current upstream v0.0.7 schema. Planned V1 groups are:
+Migrations execute in numeric order, skip recorded versions, and record a version only after all statements for it succeed. They are safe on both an empty database and the current upstream v0.0.7 schema. Implemented V1 groups are:
 
 1. Domain, Mailbox, and Provider Config.
 2. Inbound Message and Attachment indexes.
-3. Outbound Message and Attempt state.
-4. DNS check cache.
+3. Explicit inbound body-truncation signal.
+4. Outbound Message and Attempt state.
+5. DNS check cache.
 
 The runner is idempotent and must not drop or rewrite `raw_mails`, `address`, `sendbox`, `settings`, or upstream version data.
 

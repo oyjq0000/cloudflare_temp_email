@@ -94,3 +94,9 @@ Failed messages may be manually retried. Unknown messages cannot be retried in p
 - Contact APIs use structured errors without changing legacy response formats.
 - DNS checks are read-only and cached; DNS failure maps to `unknown`.
 - No production deployment, remote push, real provider call, or Cloudflare resource mutation is part of implementation.
+
+## V1 scale evidence
+
+The E2E-only, mode-guarded seed path creates 50 Domains and 1,000 indexed messages without invoking MIME parsing or an external service. A 100-row metadata page measured 50,422 UTF-8 bytes and 202 ms on the local Wrangler/D1 runtime, with a next cursor and no body fields. A list containing otherwise equivalent 32-byte and 512-KiB attachments measured 1,076 bytes and contained no attachment payload. The seed route returns 404 unless `E2E_TEST_MODE=true`.
+
+Operational, security, deployment, recovery, and upstream procedures are maintained in `DNS_AND_OPERATIONS.md`, `SECURITY.md`, `DEPLOYMENT.md`, and `UPSTREAM_SYNC.md`; the final evidence matrix is in `FINAL_REPORT.md`.

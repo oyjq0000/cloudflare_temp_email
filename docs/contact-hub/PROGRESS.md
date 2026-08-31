@@ -93,7 +93,7 @@
 ## Phase 8
 
 - Status: implementation and every host-executable mock/local gate completed; the single Docker Compose orchestration command is host-infrastructure blocked before container startup.
-- Commits: implementation/test commit pending creation; final documentation closure follows it.
+- Commits: `9b469e0` (`test(contact-hub): complete full regression and browser coverage`); final documentation closure commit contains `FINAL_REPORT.md` and the completed runbooks.
 - Files: E2E-only guarded bulk seed; 50-Domain/1,000-message and attachment-footprint API tests; Contact browser security/mobile test; portable host/Docker Mailpit hostname support; client filename sanitization; rendered remote-image consent fix; complete CORS frontend-header allowlist; `SECURITY.md`, `DEPLOYMENT.md`, `UPSTREAM_SYNC.md`, and `FINAL_REPORT.md`.
 - Tests:
   - Worker: 41/41; lint pass; Wrangler dry-run build pass (no deployment).

@@ -19,6 +19,6 @@ DKIM checks query the explicit `<selector>._domainkey.<domain>` name as TXT and 
 
 `POST /admin/contact/operations/reconcile-stale` changes an outbound record that has remained `sending` past the chosen 5–1440 minute window to `unknown`. Its open attempt is also closed as `unknown`. This action never invokes a Provider and never automatically retries the message.
 
-Browser requests to `/admin/contact/*` are same-origin unless their exact origin is listed in `CONTACT_ALLOWED_ORIGINS`. Wildcards and origins containing paths or credentials are rejected. Legacy API CORS behavior is unchanged.
+Browser requests to `/admin/contact/*` are same-origin unless their exact origin is listed in `CONTACT_ALLOWED_ORIGINS`. Wildcards and origins containing paths or credentials are rejected. Preflight allows only the authentication, idempotency, language, content-type, and fingerprint headers actually sent by the frontend; it does not reflect arbitrary requested headers. Legacy API CORS behavior is unchanged.
 
 Provider diagnostics stored in D1 are classified and generic. Arbitrary provider bodies, exception messages, Secret References, authorization headers, and Secret values are not logged or persisted.
