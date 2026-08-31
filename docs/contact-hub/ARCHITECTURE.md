@@ -75,7 +75,7 @@ Temp Mode does not read `contact_domains` as public domains and keeps legacy sen
 
 The Contact path normalizes the envelope recipient, loads the Domain/Mailbox, rejects disabled or unknown recipients, reads the raw message, parses MIME once, computes a stable dedupe key, and persists the legacy fallback plus Contact index before optional side effects.
 
-The D1 business record is the reliable base. R2 failures retain the D1/legacy fallback and surface `storage_status=failed` for repair. Reliable persistence failure prevents forwarding, Telegram, webhook, and auto-reply side effects. Spam-classified messages are stored in the Spam folder rather than discarded; hard blacklist rejection remains possible.
+The D1 business record is the reliable base. R2 failures retain the D1/legacy fallback and surface `storage_status=fallback` (no binding, full D1 raw available) or `degraded` (an object write failed or the bounded raw fallback is incomplete) for repair. `stored` means the raw EML and every attachment were written to R2. Reliable D1 persistence failure prevents forwarding, Telegram, webhook, and auto-reply side effects. Spam-classified messages are stored in the Spam folder rather than discarded; hard blacklist rejection remains possible.
 
 ## Outbound transaction boundary
 

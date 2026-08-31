@@ -39,7 +39,7 @@
 ## Phase 2
 
 - Status: completed.
-- Commit: `feat(contact-db): add domain and mailbox management` (hash recorded in the Phase 3 update after commit creation).
+- Commit: `85e3e74` (`feat(contact-db): add domain and mailbox management`).
 - Files: independent numeric Contact migration runner/version API; `contact_domains`, `contact_mailboxes`, and `contact_provider_configs`; normalized Domain/Mailbox CRUD; atomic upstream `address` synchronization; soft disable and default-mailbox invariants; Legacy delete/cleanup protection; Contact Domain/Mailbox management UI; and dedicated E2E coverage.
 - Tests: Worker 18/18; Worker lint pass; explicit Worker dry-run build pass; Frontend 63/63; Frontend production build pass; Playwright discovery pass (166 tests). Local Contact Wrangler API suites passed 7/7, including migration idempotency and upstream-version isolation, normalized Domain creation, fixed-address synchronization, cross-Domain rejection, 50 private Domains, public-settings redaction, and Legacy delete/cleanup preservation. Full Docker E2E remains blocked by the host daemon issue recorded in Baseline.
 - Decisions: Contact migration versions are numeric and independent of upstream `db_version`; Domain names and Mailbox address ownership are immutable; deletion is a soft disable; the first Mailbox is always the Domain default; default Mailboxes cannot be disabled until another default is selected; Contact-owned upstream addresses are excluded from old deletion and scheduled cleanup paths. Contact Mode also rejects custom SQL cleanup because arbitrary DELETE statements cannot be safely scoped.
@@ -47,7 +47,12 @@
 
 ## Phase 3
 
-- Status: pending.
+- Status: completed.
+- Commit: `feat(contact-inbound): add indexed inbound ingestion and R2 storage` (hash recorded in the Phase 4 update after commit creation).
+- Files: Contact migrations 2-3 for message/attachment indexes and truncation visibility; fixed-recipient Contact ingress; single-pass PostalMime parsing; Message-ID and raw-SHA256 dedupe; atomic D1 business/Legacy fallback persistence; private R2 object store with server-generated keys and checksums; storage status/repair API and Hub status; local R2 binding fixture; bilingual binding docs; and Contact inbound E2E coverage.
+- Tests: Worker 20/20; Worker lint pass; explicit Worker dry-run build pass; Frontend 63/63; Frontend production build pass; Compose configuration pass. Local Contact Wrangler suites passed 13/13. The six inbound cases prove Plain/HTML/Multipart/CID/Attachment parsing, D1 metadata without attachment bytes, raw/attachment R2 writes, Message-ID and no-Message-ID dedupe, R2 failure fallback plus repair, D1 failure with no forward/reply side effects, Spam persistence, unknown-recipient rejection, and authenticated storage health.
+- Decisions: Contact ingress validates enabled Domain and Mailbox rows instead of `DOMAINS`; hard blacklist remains a pre-ingest rejection; junk classification maps to the Spam folder. D1 is committed before any external side effect. Raw EML and attachments use private, server-generated R2 keys; user filenames are metadata only. Raw D1 fallback is bounded at 1.5 MB, parsed bodies at 512k characters each, and truncation is explicit. Missing R2 uses `fallback`; partial/missing object writes use `degraded`; complete object persistence uses `stored`.
+- Remaining risks: production requires a manually created private R2 bucket/binding and a reviewed migration. The current repair path needs the bounded D1 raw fallback; messages larger than that require the original R2 object or external recovery if the initial R2 write failed.
 
 ## Phase 4
 

@@ -22,8 +22,8 @@ test.describe.serial('Contact Domain and Mailbox management', () => {
     expect(first.ok()).toBe(true);
     expect(await first.json()).toMatchObject({
       ok: true,
-      currentVersion: 1,
-      targetVersion: 1,
+      currentVersion: 3,
+      targetVersion: 3,
       pending: [],
     });
 
@@ -32,9 +32,9 @@ test.describe.serial('Contact Domain and Mailbox management', () => {
     });
     expect(second.ok()).toBe(true);
     const secondBody = await second.json();
-    expect(secondBody.currentVersion).toBe(1);
+    expect(secondBody.currentVersion).toBe(3);
     expect(secondBody.pending).toEqual([]);
-    expect(secondBody.applied).toHaveLength(1);
+    expect(secondBody.applied).toHaveLength(3);
 
     const legacyAfter = await (await request.get(`${WORKER_CONTACT_URL}/admin/db_version`, {
       headers: ADMIN_HEADERS,

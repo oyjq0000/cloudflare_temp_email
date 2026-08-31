@@ -27,6 +27,16 @@
 
 Contact Mode 必须配置非空 `ADMIN_PASSWORDS`，或配置 `ADMIN_USER_ROLE` 并使用具备该角色的账户登录。生产环境不得设置 `DISABLE_ADMIN_PASSWORD_CHECK=true`；该组合会让 `/health_check` 返回不安全配置错误。只有同时设置 `E2E_TEST_MODE=true` 的本地测试环境允许免密例外。
 
+Contact 入站会把可搜索索引与有大小上限的 raw 兜底保存在 D1，把原始 EML 和附件字节保存在私有 R2 Bucket。请手工创建 Bucket 并增加以下 Binding，且不要开启公开访问：
+
+```toml
+[[r2_buckets]]
+binding = "CONTACT_R2"
+bucket_name = "private-contact-mail"
+```
+
+Binding 缺失或 R2 写入失败时，邮件仍通过 D1 兜底可见，并标记为 `storage_status=fallback` 或 `degraded`。恢复 R2 后使用经过管理员鉴权的 Contact 存储状态/修复 API；不要在前端配置中填写任何 R2 公开 URL。
+
 ## 后台相关变量
 
 | 变量名                         | 类型      | 说明                                 | 示例             |

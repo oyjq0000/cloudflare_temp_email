@@ -4,6 +4,7 @@ import { getContactAdminSecurityStatus, resolveAppMode } from '../app_mode'
 import * as dbApi from './db/api'
 import * as domainApi from './domains/api'
 import * as mailboxApi from './mailboxes/api'
+import * as storageApi from './storage/api'
 
 export const api = new Hono<HonoCustomType>()
 
@@ -24,11 +25,14 @@ api.get('/admin/contact/status', c => c.json({
     ok: true,
     mode: resolveAppMode(c.env),
     adminSecurity: getContactAdminSecurityStatus(c.env),
-    phase: 2,
+    phase: 3,
 }))
 
 api.get('/admin/contact/db/version', dbApi.getVersion)
 api.post('/admin/contact/db/migrate', dbApi.migrate)
+
+api.get('/admin/contact/storage/status', storageApi.status)
+api.post('/admin/contact/storage/repair/:id', storageApi.repair)
 
 api.get('/admin/contact/domains', domainApi.list)
 api.post('/admin/contact/domains', domainApi.create)

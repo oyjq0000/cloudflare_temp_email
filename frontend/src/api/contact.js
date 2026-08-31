@@ -5,6 +5,8 @@ const jsonBody = (body) => JSON.stringify(body)
 export const contactApi = {
   getMigrationStatus: () => api.fetch('/admin/contact/db/version'),
   migrate: () => api.fetch('/admin/contact/db/migrate', { method: 'POST' }),
+  getStorageStatus: () => api.fetch('/admin/contact/storage/status'),
+  repairStorage: (id) => api.fetch(`/admin/contact/storage/repair/${id}`, { method: 'POST' }),
 
   listDomains: () => api.fetch('/admin/contact/domains'),
   createDomain: (input) => api.fetch('/admin/contact/domains', {

@@ -26,8 +26,10 @@ Implemented migration versions:
 | Version | Name | Tables/indexes |
 | --- | --- | --- |
 | 1 | `contact_domain_mailbox_provider_core` | `contact_domains`, `contact_mailboxes`, `contact_provider_configs`, their lookup indexes, and the one-default-Mailbox partial unique index |
+| 2 | `contact_inbound_message_storage` | `contact_messages`, `contact_attachments`, dedupe/Legacy links, inbox indexes, and per-object storage state |
+| 3 | `contact_inbound_truncation_signal` | Explicit `contact_messages.content_truncated` signal for bounded D1 body indexing |
 
-The authenticated endpoints are `GET /admin/contact/db/version` and `POST /admin/contact/db/migrate`. Running the latter repeatedly is a no-op after version 1 has been recorded.
+The authenticated endpoints are `GET /admin/contact/db/version` and `POST /admin/contact/db/migrate`. Running the latter repeatedly is a no-op after the current target has been recorded.
 
 ## Core entities
 
@@ -63,7 +65,7 @@ Required columns: `id`, `name`, `provider_type`, `enabled`, `config_json`, `secr
 
 One indexed Contact record maps to one legacy raw row via unique `raw_mail_id`. `dedupe_key` is independently unique for concurrent redelivery protection. Body fields are returned only by detail APIs.
 
-Required columns: `id`, `raw_mail_id`, `domain_id`, `mailbox_id`, `envelope_from`, `from_name`, `from_address`, `reply_to_address`, `to_address`, `cc_json`, `subject`, `preview`, `text_body`, `html_body`, `message_id_header`, `in_reply_to_header`, `references_json`, `dedupe_key`, `folder`, `is_read`, `spam_reason`, `has_attachments`, `raw_storage_key`, `storage_status`, `received_at`, `created_at`, `updated_at`.
+Required columns: `id`, `raw_mail_id`, `domain_id`, `mailbox_id`, `envelope_from`, `from_name`, `from_address`, `reply_to_address`, `to_address`, `cc_json`, `headers_json`, `subject`, `preview`, `text_body`, `html_body`, `message_id_header`, `in_reply_to_header`, `references_json`, `dedupe_key`, `folder`, `is_read`, `spam_reason`, `has_attachments`, `raw_storage_key`, `storage_status`, `parse_status`, `parse_error`, `content_truncated`, `received_at`, `created_at`, `updated_at`.
 
 Allowed folders are `inbox` and `spam`. Suggested indexes:
 
@@ -73,11 +75,13 @@ Allowed folders are `inbox` and `spam`. Suggested indexes:
 - `from_address`, `to_address`, `subject`
 - unique `dedupe_key`, unique `raw_mail_id`
 
+`storage_status` is `pending`, `stored`, `fallback`, or `degraded`. `fallback` means the private R2 binding is absent but the bounded D1 raw MIME is available; `degraded` means at least one object write failed or that raw fallback is incomplete. `parse_status=failed` retains raw/fallback data without running mail side effects. `content_truncated=1` makes the 512k-character D1 body indexing cap visible.
+
 ### `contact_attachments`
 
 Stores metadata and server-generated R2 keys, never user-controlled paths or bytes in D1.
 
-Required columns: `id`, `message_id`, `filename`, `mime_type`, `disposition`, `content_id`, `size`, `sha256`, `storage_key`, `created_at`.
+Required columns: `id`, `message_id`, `filename`, `mime_type`, `disposition`, `content_id`, `size`, `sha256`, `storage_key`, `storage_status`, `created_at`.
 
 Object keys follow `contact/messages/<server-id>/attachments/<server-id>`. Raw messages use `contact/messages/<server-id>/raw.eml`.
 

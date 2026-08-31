@@ -12,6 +12,8 @@ import { forwardEmail } from "./forward";
 import { EmailRuleSettings } from "../models";
 import { CONSTANTS } from "../constants";
 import { compressText } from "../gzip";
+import { resolveAppMode } from "../app_mode";
+import { receiveContactEmail } from "../contact/inbound/handler";
 
 
 async function email(message: ForwardableEmailMessage, env: Bindings, ctx: ExecutionContext) {
@@ -20,6 +22,10 @@ async function email(message: ForwardableEmailMessage, env: Bindings, ctx: Execu
         message.setReject("Reject from address");
         console.log(`Reject message from ${message.from} to ${toAddress}`);
         return;
+    }
+    if (resolveAppMode(env) === 'contact') {
+        await receiveContactEmail(message, env, ctx)
+        return
     }
     const rawEmail = await new Response(message.raw).text();
     const parsedEmailContext: ParsedEmailContext = {

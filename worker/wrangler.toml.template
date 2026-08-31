@@ -169,6 +169,13 @@ binding = "DB"
 database_name = "xxx"
 database_id = "xxx"
 
+# Contact Hub private object storage for raw EML and attachments. Create the
+# bucket manually, keep it private, then configure the binding before enabling
+# production inbound traffic.
+# [[r2_buckets]]
+# binding = "CONTACT_R2"
+# bucket_name = "private-contact-mail"
+
 # Workers AI binding (required for AI email extraction)
 # [ai]
 # binding = "AI"

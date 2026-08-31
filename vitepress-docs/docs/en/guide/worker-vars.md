@@ -27,6 +27,16 @@ When enabled, the Worker rejects public mailbox creation, address login/manageme
 
 Contact Mode requires non-empty `ADMIN_PASSWORDS`, or `ADMIN_USER_ROLE` with a successfully authenticated account carrying that role. Production must not set `DISABLE_ADMIN_PASSWORD_CHECK=true`; that combination makes `/health_check` report an unsafe configuration. The passwordless exception is limited to local tests that also set `E2E_TEST_MODE=true`.
 
+Contact inbound stores its searchable index and a bounded raw fallback in D1, and stores raw EML plus attachment bytes in a private R2 bucket. Create the bucket manually and add this binding; never enable public bucket access:
+
+```toml
+[[r2_buckets]]
+binding = "CONTACT_R2"
+bucket_name = "private-contact-mail"
+```
+
+If the binding or an R2 write is unavailable, the message remains visible through its D1 fallback with `storage_status=fallback` or `degraded`. Use the authenticated Contact storage status/repair APIs after restoring R2. Do not put an R2 public URL in frontend configuration.
+
 ## Console Related Variables
 
 | Variable Name                  | Type      | Description                                             | Example          |

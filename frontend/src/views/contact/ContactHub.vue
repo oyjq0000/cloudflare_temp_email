@@ -18,6 +18,7 @@ const authorized = ref(false)
 const loadingStatus = ref(false)
 const migration = ref(null)
 const migrating = ref(false)
+const storage = ref(null)
 const activeSection = ref('domains')
 
 const copy = computed(() => locale.value === 'zh' ? {
@@ -27,6 +28,7 @@ const copy = computed(() => locale.value === 'zh' ? {
   migrationBody: '迁移只创建独立的 contact_* 表，不修改上游 db_version。',
   migrate: '执行 Contact Migration',
   domains: 'Domains', mailboxes: 'Mailboxes', inbox: 'Inbox', inboxPending: 'Unified Inbox 将在 Phase 4 接入。',
+  storageOk: 'R2 私有存储正常', storageBad: 'R2 Binding 不可用，入站将使用 D1 兜底',
   advanced: '高级管理',
   logout: '退出',
   securityOk: '管理员安全配置有效',
@@ -38,6 +40,7 @@ const copy = computed(() => locale.value === 'zh' ? {
   migrationBody: 'The migration only creates independent contact_* tables and does not modify the upstream db_version.',
   migrate: 'Run Contact Migration',
   domains: 'Domains', mailboxes: 'Mailboxes', inbox: 'Inbox', inboxPending: 'Unified Inbox is added in Phase 4.',
+  storageOk: 'Private R2 storage is available', storageBad: 'R2 binding is unavailable; inbound uses the D1 fallback',
   advanced: 'Advanced admin',
   logout: 'Sign out',
   securityOk: 'Administrator security is configured',
@@ -55,6 +58,7 @@ const loadStatus = async () => {
   try {
     status.value = await api.fetch('/admin/contact/status')
     migration.value = await contactApi.getMigrationStatus()
+    if (!migration.value.pending?.length) storage.value = await contactApi.getStorageStatus()
     authorized.value = true
   } catch {
     authorized.value = false
@@ -67,6 +71,7 @@ const migrate = async () => {
   migrating.value = true
   try {
     migration.value = await contactApi.migrate()
+    storage.value = await contactApi.getStorageStatus()
   } finally {
     migrating.value = false
   }
@@ -80,6 +85,7 @@ const signOut = () => {
   authorized.value = false
   status.value = null
   migration.value = null
+  storage.value = null
 }
 
 onMounted(async () => {
@@ -111,6 +117,11 @@ onMounted(async () => {
       </header>
       <main class="contact-main">
         <n-alert :type="securityType" :title="securityText" />
+        <n-alert
+          v-if="storage"
+          :type="storage.bindingAvailable ? 'success' : 'warning'"
+          :title="storage.bindingAvailable ? copy.storageOk : copy.storageBad"
+        />
         <n-card v-if="migration?.pending?.length" class="migration-card">
           <n-result status="warning" :title="copy.migrationTitle" :description="copy.migrationBody">
             <template #footer><n-button type="primary" :loading="migrating" @click="migrate">{{ copy.migrate }}</n-button></template>
