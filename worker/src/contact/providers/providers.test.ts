@@ -34,6 +34,15 @@ test('Brevo HTTP adapter classifies explicit rejection and uncertain network los
     )
     const uncertain = new BrevoProvider(async () => { throw new Error('connection reset') })
     assert.match((await uncertain.send(message, { config: {}, secrets: { apiKey: 'x' } })).errorClass || '', /network/)
+    const timeout = new BrevoProvider(async () => { throw new DOMException('timed out', 'TimeoutError') })
+    assert.deepEqual(
+        await timeout.send(message, { config: {}, secrets: { apiKey: 'local-only' } }),
+        {
+            certainty: 'unknown', retryable: false, errorClass: 'network_timeout',
+            errorCode: 'PROVIDER_TIMEOUT',
+            errorMessage: 'Provider request timed out with an uncertain delivery result',
+        },
+    )
 })
 
 test('SMTP adapter validates secrets before calling the transport and classifies results', async () => {

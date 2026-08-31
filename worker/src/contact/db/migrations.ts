@@ -205,6 +205,30 @@ export const CONTACT_MIGRATIONS: ContactMigration[] = [
                 ON contact_outbound_attempts(outbound_message_id, attempt_no)`,
         ],
     },
+    {
+        version: 5,
+        name: 'contact_dns_check_cache',
+        statements: [
+            `CREATE TABLE IF NOT EXISTS contact_dns_checks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                domain_id INTEGER NOT NULL,
+                provider_config_id INTEGER,
+                record_purpose TEXT NOT NULL CHECK(record_purpose IN ('mx', 'spf', 'dkim', 'dmarc')),
+                record_type TEXT NOT NULL,
+                record_name TEXT NOT NULL,
+                expected_json TEXT NOT NULL DEFAULT '[]',
+                observed_json TEXT NOT NULL DEFAULT '[]',
+                status TEXT NOT NULL CHECK(status IN ('valid', 'missing', 'invalid', 'unknown')),
+                checked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(domain_id) REFERENCES contact_domains(id),
+                FOREIGN KEY(provider_config_id) REFERENCES contact_provider_configs(id)
+            )`,
+            `CREATE INDEX IF NOT EXISTS idx_contact_dns_checks_domain_checked
+                ON contact_dns_checks(domain_id, checked_at DESC, id DESC)`,
+            `CREATE INDEX IF NOT EXISTS idx_contact_dns_checks_lookup
+                ON contact_dns_checks(domain_id, record_purpose, record_name, checked_at DESC)`,
+        ],
+    },
 ]
 
 export const CONTACT_SCHEMA_VERSION = CONTACT_MIGRATIONS.at(-1)?.version || 0

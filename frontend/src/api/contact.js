@@ -45,6 +45,15 @@ export const contactApi = {
   updateProvider: (id, input) => api.fetch(`/admin/contact/providers/${id}`, { method: 'PATCH', body: jsonBody(input) }),
   disableProvider: (id) => api.fetch(`/admin/contact/providers/${id}`, { method: 'DELETE' }),
 
+  getDnsChecks: (domainId) => api.fetch(`/admin/contact/domains/${domainId}/dns`),
+  refreshDnsChecks: (domainId, input) => api.fetch(`/admin/contact/domains/${domainId}/dns/refresh`, {
+    method: 'POST', body: jsonBody(input),
+  }),
+  getHealth: () => api.fetch('/admin/contact/health'),
+  reconcileStaleSending: (olderThanMinutes = 15) => api.fetch('/admin/contact/operations/reconcile-stale', {
+    method: 'POST', body: jsonBody({ older_than_minutes: olderThanMinutes }),
+  }),
+
   listMessages: (params) => api.fetch(`/admin/contact/messages${queryString(params)}`),
   getMessage: (id) => api.fetch(`/admin/contact/messages/${id}`),
   markRead: (id) => api.fetch(`/admin/contact/messages/${id}/read`, { method: 'POST' }),

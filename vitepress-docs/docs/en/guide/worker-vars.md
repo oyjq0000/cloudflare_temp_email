@@ -19,9 +19,11 @@
 
 ## Contact Hub Mode
 
-| Variable Name       | Type      | Description                                                                                           | Example |
-| ------------------- | --------- | ----------------------------------------------------------------------------------------------------- | ------- |
-| `CONTACT_MAIL_MODE` | Text/JSON | Enable the private multi-domain Contact Mail Hub; Temp Mode remains active unless explicitly `true` | `true`  |
+| Variable Name                     | Type      | Description                                                                                           | Example                        |
+| --------------------------------- | --------- | ----------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `CONTACT_MAIL_MODE`               | Text/JSON | Enable the private multi-domain Contact Mail Hub; Temp Mode remains active unless explicitly `true` | `true`                         |
+| `CONTACT_ALLOWED_ORIGINS`         | JSON      | Explicit cross-origin allowlist for Contact APIs; same-origin is always allowed and `*` is rejected | `["https://mail.example.com"]` |
+| `CONTACT_DNS_CACHE_TTL_SECONDS`   | Number    | DNS check staleness window from 60 to 86400 seconds; defaults to 3600                                | `3600`                         |
 
 When enabled, the Worker rejects public mailbox creation, address login/management, public sending, registration, OAuth, the user portal, and Telegram public-address entry points. The frontend redirects `/` and `/user` to the private `/hub`. `/open_api/settings` exposes only mode/capability information and never Contact Domains, Mailboxes, Providers, or Secret References.
 
@@ -36,6 +38,8 @@ bucket_name = "private-contact-mail"
 ```
 
 If the binding or an R2 write is unavailable, the message remains visible through its D1 fallback with `storage_status=fallback` or `degraded`. Use the authenticated Contact storage status/repair APIs after restoring R2. Do not put an R2 public URL in frontend configuration.
+
+The Contact DNS panel only reads and caches MX/TXT/CNAME records; it never changes DNS. Administrators must enter an explicit DKIM selector. Query failures are `unknown`, not `invalid`. Multiple SPF records are `invalid`, and the UI never recommends creating a second SPF record.
 
 ## Console Related Variables
 

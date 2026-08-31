@@ -2,6 +2,7 @@ import { ContactError } from '../errors.ts'
 import { getProviderConfig } from '../providers/config_service.ts'
 import { ContactProviderRegistry, sendWithContactProvider } from '../providers/registry.ts'
 import type { ProviderSendResult } from '../providers/types.ts'
+import { sanitizeProviderResult } from '../security/diagnostics.ts'
 import {
     bodyText,
     localMessageId,
@@ -273,13 +274,13 @@ export const dispatchOutbound = async (
     }
 
     const row = await getOutboundRow(env.DB, id)
-    const result = await sendWithContactProvider(env, provider, {
+    const result = sanitizeProviderResult(await sendWithContactProvider(env, provider, {
         fromName: row.from_name, fromAddress: row.from_address,
         toName: row.to_name, toAddress: row.to_address, subject: row.subject,
         textBody: row.text_body, htmlBody: row.html_body,
         messageId: row.message_id_header, inReplyTo: row.in_reply_to_header,
         references: jsonArray(row.references_json),
-    }, registry)
+    }, registry))
     const state = mapState(result)
     const updates = await env.DB.batch([
         env.DB.prepare(`

@@ -31,6 +31,7 @@ type Bindings = {
     DEFAULT_LANG: string | undefined
     CONTACT_MAIL_MODE: string | boolean | undefined
     CONTACT_ALLOWED_ORIGINS: string | string[] | undefined
+    CONTACT_DNS_CACHE_TTL_SECONDS: string | number | undefined
     TITLE: string | undefined
     ANNOUNCEMENT: string | undefined | null
     ALWAYS_SHOW_ANNOUNCEMENT: string | boolean | undefined

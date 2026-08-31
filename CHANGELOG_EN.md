@@ -16,6 +16,7 @@
 - feat: |Contact Hub| Add the unified inbox, server-side filtering and cursor pagination, on-demand message details, read/Spam state, and authenticated raw/attachment downloads
 - feat: |Contact Hub| Add Resend/Brevo/SMTP Provider contracts, a registry, Secret Resolver, config CRUD/UI, and explicit Domain assignment while preserving the Legacy provider order
 - feat: |Contact Hub| Add the idempotent outbound state machine, atomic claims, Attempt/Sent audit, manual Failed retry, Unknown Force Resend, and Compose/Reply/Sent UI
+- feat: |Contact Hub| Add read-only MX/SPF/DKIM/DMARC checks and caching, operational health, stale-Sending reconciliation, and same-origin/allowlist CORS for Contact APIs
 - feat: |Admin| Add D1 storage capacity details to the database page, with persistent Free and Workers Paid plan selection and a comparison between the current database size and capacity limit
 - feat: |Admin| Add one-click random email-name generation to the address creation page (issue #1126)
 - feat: |User| Add mail composition, inbox-style sent-item filtering by bound address, and the shared address-credentials dialog to the user center, backed by User JWT APIs for address settings, send-access requests, sending, and sent-item management
@@ -25,6 +26,7 @@
 - fix: |Contact Hub| Prevent Legacy address deletion, inbox/sent clearing, scheduled Cleanup, and Contact Mode custom SQL Cleanup from removing fixed Contact Mailboxes
 - fix: |Contact Hub| Do not run forwarding, AI, Telegram, Webhook, or Auto Reply before reliable Contact D1 persistence; retain a visible D1 fallback with degraded/fallback state when R2 fails
 - fix: |Contact Hub| Unify HTML-mail sanitization, block remote images by default, isolate iframe/Shadow DOM/Sent/Telegram rendering from executable content, and force dangerous attachments to binary downloads
+- fix: |Contact Hub| Persist only classified provider diagnostics, map DNS failures to Unknown, mark multiple SPF records Invalid, and keep Unknown/stale-Sending states free of automatic retries
 - fix: |Admin| Fix secondary tabs occasionally losing their active item, hiding content, and leaving the indicator offset after switching primary tabs
 - fix: |Send Mail| Use a consistent address/name field order and align the empty content editor caret with its placeholder
 - fix: |User Send Mail| Apply role-based unlimited sending to user-address APIs

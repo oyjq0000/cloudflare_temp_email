@@ -11,6 +11,7 @@ import { api as adminApi } from './admin_api';
 import { api as apiSendMail } from './mails_api/send_mail_api'
 import { api as telegramApi } from './telegram_api'
 import { api as contactApi } from './contact'
+import { contactCors } from './contact/cors'
 
 import i18n from './i18n';
 import { email } from './email';
@@ -35,7 +36,13 @@ const API_PATHS = [
 
 const app = new Hono<HonoCustomType>()
 //cors
-app.use('/*', cors());
+app.use('/*', contactCors());
+const legacyCors = cors()
+app.use('/*', (c, next) => (
+	c.req.path === '/admin/contact' || c.req.path.startsWith('/admin/contact/')
+		? next()
+		: legacyCors(c, next)
+));
 // error handler
 app.onError((err, c) => {
 	console.error(err)

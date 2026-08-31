@@ -2,10 +2,12 @@ import { Hono } from 'hono'
 
 import { getContactAdminSecurityStatus, resolveAppMode } from '../app_mode'
 import * as dbApi from './db/api'
+import * as dnsApi from './dns/api'
 import * as domainApi from './domains/api'
 import * as mailboxApi from './mailboxes/api'
 import * as messageApi from './messages/api'
 import * as outboundApi from './outbound/api'
+import * as operationsApi from './operations/api'
 import * as providerApi from './providers/config_api'
 import * as storageApi from './storage/api'
 
@@ -28,7 +30,7 @@ api.get('/admin/contact/status', c => c.json({
     ok: true,
     mode: resolveAppMode(c.env),
     adminSecurity: getContactAdminSecurityStatus(c.env),
-    phase: 6,
+    phase: 7,
 }))
 
 api.get('/admin/contact/db/version', dbApi.getVersion)
@@ -40,6 +42,8 @@ api.post('/admin/contact/storage/repair/:id', storageApi.repair)
 api.get('/admin/contact/domains', domainApi.list)
 api.post('/admin/contact/domains', domainApi.create)
 api.get('/admin/contact/domains/:id', domainApi.get)
+api.get('/admin/contact/domains/:id/dns', dnsApi.list)
+api.post('/admin/contact/domains/:id/dns/refresh', dnsApi.refresh)
 api.patch('/admin/contact/domains/:id', domainApi.update)
 api.delete('/admin/contact/domains/:id', domainApi.remove)
 
@@ -70,3 +74,6 @@ api.post('/admin/contact/outbound', outboundApi.send)
 api.get('/admin/contact/outbound/:id', outboundApi.get)
 api.post('/admin/contact/outbound/:id/retry', outboundApi.retry)
 api.post('/admin/contact/outbound/:id/force-resend', outboundApi.forceResend)
+
+api.get('/admin/contact/health', operationsApi.health)
+api.post('/admin/contact/operations/reconcile-stale', operationsApi.reconcile)

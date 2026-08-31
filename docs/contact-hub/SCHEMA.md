@@ -29,6 +29,7 @@ Implemented migration versions:
 | 2 | `contact_inbound_message_storage` | `contact_messages`, `contact_attachments`, dedupe/Legacy links, inbox indexes, and per-object storage state |
 | 3 | `contact_inbound_truncation_signal` | Explicit `contact_messages.content_truncated` signal for bounded D1 body indexing |
 | 4 | `contact_outbound_state_machine` | `contact_outbound_messages`, append-only `contact_outbound_attempts`, status/idempotency constraints, and lookup indexes |
+| 5 | `contact_dns_check_cache` | `contact_dns_checks` plus Domain/purpose/cache lookup indexes |
 
 Provider Config CRUD and Domain assignment are implemented on the version 1 tables. API serialization exposes non-secret configuration and per-secret configured booleans, never `secret_refs_json` or resolved values.
 
@@ -106,7 +107,7 @@ Required columns: `id`, `outbound_message_id`, `attempt_no`, `provider_config_id
 
 ## DNS cache
 
-### `contact_dns_checks`
+### `contact_dns_checks` (implemented)
 
 Stores read-only observed/expected records by purpose (`mx`, `spf`, `dkim`, `dmarc`). Status is `valid`, `missing`, `invalid`, or `unknown`. Network/parse failures are `unknown`, not `invalid`.
 

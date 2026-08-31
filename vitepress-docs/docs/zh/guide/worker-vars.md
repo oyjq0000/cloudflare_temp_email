@@ -19,9 +19,11 @@
 
 ## Contact Hub 模式
 
-| 变量名              | 类型      | 说明                                                                 | 示例   |
-| ------------------- | --------- | -------------------------------------------------------------------- | ------ |
-| `CONTACT_MAIL_MODE` | 文本/JSON | 启用私有多域名 Contact Mail Hub；未显式设为 `true` 时保持临时邮箱模式 | `true` |
+| 变量名                            | 类型      | 说明                                                                 | 示例                           |
+| --------------------------------- | --------- | -------------------------------------------------------------------- | ------------------------------ |
+| `CONTACT_MAIL_MODE`               | 文本/JSON | 启用私有多域名 Contact Mail Hub；未显式设为 `true` 时保持临时邮箱模式 | `true`                         |
+| `CONTACT_ALLOWED_ORIGINS`         | JSON      | Contact API 跨域允许列表；同源始终允许，不接受 `*`                    | `["https://mail.example.com"]` |
+| `CONTACT_DNS_CACHE_TTL_SECONDS`   | 数字      | DNS 检查结果过期时间，允许 60-86400 秒，默认 3600                     | `3600`                         |
 
 启用后，Worker 会在后端拒绝公共邮箱创建、地址登录/管理、公共发件、用户注册、OAuth、用户门户及 Telegram 公共地址入口；前端 `/` 与 `/user` 会转到私有 `/hub`。`/open_api/settings` 只公开模式和 capability，不会返回 Contact Domain、Mailbox、Provider 或 Secret Reference。
 
@@ -36,6 +38,8 @@ bucket_name = "private-contact-mail"
 ```
 
 Binding 缺失或 R2 写入失败时，邮件仍通过 D1 兜底可见，并标记为 `storage_status=fallback` 或 `degraded`。恢复 R2 后使用经过管理员鉴权的 Contact 存储状态/修复 API；不要在前端配置中填写任何 R2 公开 URL。
+
+Contact DNS 面板只执行 MX/TXT/CNAME 读取并缓存结果，不会修改 DNS。DKIM 必须由管理员填写明确 selector；查询失败显示 `unknown`，不会误报为 `invalid`。SPF 多记录会标记为 `invalid`，界面不会建议再创建第二条 SPF。
 
 ## 后台相关变量
 

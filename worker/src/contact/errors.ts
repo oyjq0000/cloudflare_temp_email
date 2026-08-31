@@ -24,7 +24,7 @@ export const contactErrorResponse = (error: unknown) => {
             },
         }
     }
-    console.error('Contact API error', error)
+    console.error('Contact API error', safeErrorMetadata(error))
     return {
         status: 500 as const,
         body: {
@@ -44,3 +44,4 @@ export const requireContactId = (value: string | number): number => {
     }
     return id
 }
+import { safeErrorMetadata } from './security/diagnostics.ts'

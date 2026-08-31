@@ -46,6 +46,11 @@ PREFIX = "tmp"
 # Enable the private multi-domain Contact Mail Hub. Public mailbox, registration,
 # user portal, and public sending APIs are rejected when enabled.
 # CONTACT_MAIL_MODE = true
+# Browser requests to /admin/contact/* are same-origin by default. Add only the
+# exact external frontend origins that are intentionally allowed; wildcard is rejected.
+# CONTACT_ALLOWED_ORIGINS = ["https://mail.example.com"]
+# Cached DNS checks are considered stale after this many seconds (60-86400).
+# CONTACT_DNS_CACHE_TTL_SECONDS = 3600
 # For admin panel
 # ADMIN_PASSWORDS = ["123", "456"]
 # warning: no password or user check for admin portal

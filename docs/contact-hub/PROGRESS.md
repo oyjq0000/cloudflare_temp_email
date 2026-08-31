@@ -75,7 +75,7 @@
 ## Phase 6
 
 - Status: completed.
-- Commit: `feat(contact-outbound): add idempotent delivery state machine` (hash recorded in the Phase 7 update after commit creation).
+- Commit: `b6aea90` (`feat(contact-outbound): add idempotent delivery state machine`).
 - Files: migration 4 for durable outbound intents and append-only attempts; Send/Reply/List/Detail/Retry/Force Resend APIs; strict header/address/body/idempotency validation; locally generated Message-ID; D1 unique idempotency and conflict handling; compare-and-set claims; provider result/state persistence; metadata-only Sent list; Compose, Reply and Sent/Failed/Unknown UI; and state-machine/Mailpit E2E coverage.
 - Tests: Worker 31/31; Worker lint pass; explicit Worker dry-run build pass; Frontend 65/65; Frontend production build pass. Local Contact Wrangler suites passed 24 and skipped two Docker-Mailpit cases. The executed outbound cases prove one attempt under concurrent same-key sends, same-key content conflicts, Sent/Failed/Unknown mapping, provider Message ID storage, append-only attempts, Failed manual Retry, Unknown normal-Retry rejection, confirmed Force Resend with a new row/Message-ID and `force_resend_of_id`, original Unknown immutability, Reply-To precedence, Re prefix normalization, In-Reply-To/References generation, same-Domain From ownership, CRLF rejection, and body-free list payloads. The Docker cases exercise explicit SMTP and raw Reply headers through Mailpit.
 - Decisions: an outbound intent is committed before any provider call. Only a successful expected-state CAS may append an Attempt and invoke a provider. Duplicate Idempotency-Key requests return the existing intent without claiming; reuse with different content is a conflict. Provider result persistence is authoritative; a post-submission storage failure leaves a non-claimable `sending` record for Phase 7 reconciliation rather than risking resend. `unknown` has no Retry path; Force Resend always creates a new linked intent.
@@ -83,7 +83,12 @@
 
 ## Phase 7
 
-- Status: pending.
+- Status: completed.
+- Commit: `feat(contact-ops): add dns health and safety controls` (hash recorded in the Phase 8 update after commit creation).
+- Files: migration 5 and `contact_dns_checks`; Cloudflare DNS-over-HTTPS resolver; pure MX/SPF/DKIM/DMARC evaluation; explicit DKIM selector and expected-record support; cached/manual-refresh APIs and UI; Contact-only same-origin/allowlist CORS; classified Provider diagnostics; database/storage/security/count health API and dashboard; and manual stale-Sending reconciliation.
+- Tests: Worker 40/40; Worker lint pass; explicit Worker dry-run build pass; Frontend 65/65; Frontend production build pass; Compose configuration pass; Playwright discovery 189 tests in 49 files. Local Contact Wrangler suites passed 28 and skipped the two Docker-Mailpit cases. The four new operations cases prove explicit DKIM selector enforcement, MX/SPF/DKIM/DMARC cache behavior, SPF multiple-record Invalid, DNS transport failure Unknown, no second-SPF suggestion, untrusted-Origin 403, same-origin/preflight headers, stale Sending to Unknown without a second Attempt, redacted health, and Legacy mail Cleanup preservation.
+- Decisions: DNS is read-only and uses maintainable API-supplied requirements instead of scattered Provider constants. DKIM queries only the administrator-supplied selector. Contact CORS is isolated from Legacy CORS and never accepts wildcard origins. Provider exceptions and response bodies are not persisted; diagnostic fields are classified and generic. Reconciliation closes stale Attempts and intents as Unknown without invoking a Provider.
+- Remaining risks: production must supply exact allowed frontend origins and reviewed DNS expectations/selectors. DNS-over-HTTPS egress and real authoritative records require staging verification. Docker remains required for Mailpit and full browser regression in Phase 8.
 
 ## Phase 8
 
