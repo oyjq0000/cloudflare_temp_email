@@ -31,7 +31,15 @@ export class BrevoProvider implements OutboundProvider {
                     ...(message.textBody ? { textContent: message.textBody } : {}),
                     ...(message.htmlBody ? { htmlContent: message.htmlBody } : {}),
                     ...(message.replyTo ? { replyTo: { email: message.replyTo } } : {}),
-                    ...(message.messageId ? { headers: { 'Message-ID': message.messageId } } : {}),
+                    ...(
+                        message.messageId || message.inReplyTo || message.references?.length
+                            ? { headers: {
+                                ...(message.messageId ? { 'Message-ID': message.messageId } : {}),
+                                ...(message.inReplyTo ? { 'In-Reply-To': message.inReplyTo } : {}),
+                                ...(message.references?.length ? { References: message.references.join(' ') } : {}),
+                            } }
+                            : {}
+                    ),
                 }),
             })
             if (!response.ok) return rejectedHttpResult(response.status)

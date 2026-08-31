@@ -28,6 +28,7 @@ Implemented migration versions:
 | 1 | `contact_domain_mailbox_provider_core` | `contact_domains`, `contact_mailboxes`, `contact_provider_configs`, their lookup indexes, and the one-default-Mailbox partial unique index |
 | 2 | `contact_inbound_message_storage` | `contact_messages`, `contact_attachments`, dedupe/Legacy links, inbox indexes, and per-object storage state |
 | 3 | `contact_inbound_truncation_signal` | Explicit `contact_messages.content_truncated` signal for bounded D1 body indexing |
+| 4 | `contact_outbound_state_machine` | `contact_outbound_messages`, append-only `contact_outbound_attempts`, status/idempotency constraints, and lookup indexes |
 
 Provider Config CRUD and Domain assignment are implemented on the version 1 tables. API serialization exposes non-secret configuration and per-secret configured booleans, never `secret_refs_json` or resolved values.
 
@@ -89,13 +90,13 @@ Object keys follow `contact/messages/<server-id>/attachments/<server-id>`. Raw m
 
 ## Outbound entities
 
-### `contact_outbound_messages`
+### `contact_outbound_messages` (implemented)
 
 Stores the user intent and current delivery state. `idempotency_key` is unique. Status is one of `pending`, `sending`, `sent`, `failed`, or `unknown`; delivery certainty is `accepted`, `rejected`, or `unknown` when available.
 
 Required columns: `id`, `domain_id`, `mailbox_id`, `reply_to_message_id`, `force_resend_of_id`, `from_name`, `from_address`, `to_name`, `to_address`, `subject`, `text_body`, `html_body`, `message_id_header`, `in_reply_to_header`, `references_json`, `provider_config_id`, `provider_message_id`, `status`, `delivery_certainty`, `idempotency_key`, `last_error_class`, `last_error_code`, `last_error_message`, `created_at`, `sending_at`, `sent_at`, `updated_at`.
 
-### `contact_outbound_attempts`
+### `contact_outbound_attempts` (implemented)
 
 Append-only audit records for each provider invocation. The config snapshot contains provider type and non-secret configuration only.
 

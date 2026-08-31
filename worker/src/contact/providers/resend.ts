@@ -34,7 +34,15 @@ export class ResendProvider implements OutboundProvider {
                     ...(message.textBody ? { text: message.textBody } : {}),
                     ...(message.htmlBody ? { html: message.htmlBody } : {}),
                     ...(message.replyTo ? { reply_to: message.replyTo } : {}),
-                    ...(message.messageId ? { headers: { 'Message-ID': message.messageId } } : {}),
+                    ...(
+                        message.messageId || message.inReplyTo || message.references?.length
+                            ? { headers: {
+                                ...(message.messageId ? { 'Message-ID': message.messageId } : {}),
+                                ...(message.inReplyTo ? { 'In-Reply-To': message.inReplyTo } : {}),
+                                ...(message.references?.length ? { References: message.references.join(' ') } : {}),
+                            } }
+                            : {}
+                    ),
                 }),
             })
             if (!response.ok) return rejectedHttpResult(response.status)

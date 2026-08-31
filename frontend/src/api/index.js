@@ -42,6 +42,8 @@ const apiFetch = async (path, options = {}) => {
         if (customAuthHeader) headers['x-custom-auth'] = customAuthHeader;
         const adminAuthHeader = safeHeaderValue(adminAuth.value);
         if (adminAuthHeader) headers['x-admin-auth'] = adminAuthHeader;
+        const idempotencyHeader = safeHeaderValue(options.idempotencyKey);
+        if (idempotencyHeader) headers['Idempotency-Key'] = idempotencyHeader;
         const authorizationHeader = safeBearerHeader(jwt.value);
         if (authorizationHeader) headers['Authorization'] = authorizationHeader;
 

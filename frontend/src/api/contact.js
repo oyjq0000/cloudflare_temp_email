@@ -53,4 +53,19 @@ export const contactApi = {
   markNotSpam: (id) => api.fetch(`/admin/contact/messages/${id}/not-spam`, { method: 'POST' }),
   downloadRaw: (id) => api.fetch(`/admin/contact/messages/${id}/raw`, { responseType: 'blob' }),
   downloadAttachment: (id) => api.fetch(`/admin/contact/attachments/${id}`, { responseType: 'blob' }),
+
+  listOutbound: (params) => api.fetch(`/admin/contact/outbound${queryString(params)}`),
+  getOutbound: (id) => api.fetch(`/admin/contact/outbound/${id}`),
+  sendOutbound: (input, idempotencyKey) => api.fetch('/admin/contact/outbound', {
+    method: 'POST', body: jsonBody(input), idempotencyKey,
+  }),
+  replyToMessage: (id, input, idempotencyKey) => api.fetch(`/admin/contact/messages/${id}/reply`, {
+    method: 'POST', body: jsonBody(input), idempotencyKey,
+  }),
+  retryOutbound: (id, input = {}) => api.fetch(`/admin/contact/outbound/${id}/retry`, {
+    method: 'POST', body: jsonBody(input),
+  }),
+  forceResendOutbound: (id, idempotencyKey) => api.fetch(`/admin/contact/outbound/${id}/force-resend`, {
+    method: 'POST', body: jsonBody({ confirm: true }), idempotencyKey,
+  }),
 }

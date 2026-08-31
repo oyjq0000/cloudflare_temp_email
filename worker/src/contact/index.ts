@@ -5,6 +5,7 @@ import * as dbApi from './db/api'
 import * as domainApi from './domains/api'
 import * as mailboxApi from './mailboxes/api'
 import * as messageApi from './messages/api'
+import * as outboundApi from './outbound/api'
 import * as providerApi from './providers/config_api'
 import * as storageApi from './storage/api'
 
@@ -27,7 +28,7 @@ api.get('/admin/contact/status', c => c.json({
     ok: true,
     mode: resolveAppMode(c.env),
     adminSecurity: getContactAdminSecurityStatus(c.env),
-    phase: 5,
+    phase: 6,
 }))
 
 api.get('/admin/contact/db/version', dbApi.getVersion)
@@ -56,9 +57,16 @@ api.delete('/admin/contact/providers/:id', providerApi.remove)
 
 api.get('/admin/contact/messages', messageApi.list)
 api.get('/admin/contact/messages/:id', messageApi.get)
+api.post('/admin/contact/messages/:id/reply', outboundApi.reply)
 api.post('/admin/contact/messages/:id/read', messageApi.read)
 api.post('/admin/contact/messages/:id/unread', messageApi.unread)
 api.post('/admin/contact/messages/:id/spam', messageApi.spam)
 api.post('/admin/contact/messages/:id/not-spam', messageApi.notSpam)
 api.get('/admin/contact/messages/:id/raw', messageApi.raw)
 api.get('/admin/contact/attachments/:id', messageApi.attachment)
+
+api.get('/admin/contact/outbound', outboundApi.list)
+api.post('/admin/contact/outbound', outboundApi.send)
+api.get('/admin/contact/outbound/:id', outboundApi.get)
+api.post('/admin/contact/outbound/:id/retry', outboundApi.retry)
+api.post('/admin/contact/outbound/:id/force-resend', outboundApi.forceResend)

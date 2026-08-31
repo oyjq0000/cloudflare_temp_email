@@ -137,6 +137,74 @@ export const CONTACT_MIGRATIONS: ContactMigration[] = [
                 CHECK(content_truncated IN (0, 1))`,
         ],
     },
+    {
+        version: 4,
+        name: 'contact_outbound_state_machine',
+        statements: [
+            `CREATE TABLE IF NOT EXISTS contact_outbound_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                domain_id INTEGER NOT NULL,
+                mailbox_id INTEGER NOT NULL,
+                reply_to_message_id INTEGER,
+                force_resend_of_id INTEGER,
+                from_name TEXT,
+                from_address TEXT NOT NULL,
+                to_name TEXT,
+                to_address TEXT NOT NULL,
+                subject TEXT NOT NULL,
+                text_body TEXT NOT NULL DEFAULT '',
+                html_body TEXT NOT NULL DEFAULT '',
+                message_id_header TEXT NOT NULL UNIQUE,
+                in_reply_to_header TEXT,
+                references_json TEXT NOT NULL DEFAULT '[]',
+                provider_config_id INTEGER NOT NULL,
+                provider_message_id TEXT,
+                status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK(status IN ('pending', 'sending', 'sent', 'failed', 'unknown')),
+                delivery_certainty TEXT
+                    CHECK(delivery_certainty IS NULL OR delivery_certainty IN ('accepted', 'rejected', 'unknown')),
+                idempotency_key TEXT NOT NULL UNIQUE,
+                last_error_class TEXT,
+                last_error_code TEXT,
+                last_error_message TEXT,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                sending_at DATETIME,
+                sent_at DATETIME,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(domain_id) REFERENCES contact_domains(id),
+                FOREIGN KEY(mailbox_id) REFERENCES contact_mailboxes(id),
+                FOREIGN KEY(reply_to_message_id) REFERENCES contact_messages(id),
+                FOREIGN KEY(force_resend_of_id) REFERENCES contact_outbound_messages(id),
+                FOREIGN KEY(provider_config_id) REFERENCES contact_provider_configs(id)
+            )`,
+            `CREATE INDEX IF NOT EXISTS idx_contact_outbound_domain_status_created
+                ON contact_outbound_messages(domain_id, status, created_at DESC, id DESC)`,
+            `CREATE INDEX IF NOT EXISTS idx_contact_outbound_mailbox_created
+                ON contact_outbound_messages(mailbox_id, created_at DESC, id DESC)`,
+            `CREATE TABLE IF NOT EXISTS contact_outbound_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                outbound_message_id INTEGER NOT NULL,
+                attempt_no INTEGER NOT NULL,
+                provider_config_id INTEGER NOT NULL,
+                provider_type TEXT NOT NULL CHECK(provider_type IN ('resend', 'brevo', 'smtp')),
+                config_snapshot_json TEXT NOT NULL DEFAULT '{}',
+                status TEXT NOT NULL CHECK(status IN ('sending', 'sent', 'failed', 'unknown')),
+                certainty TEXT CHECK(certainty IS NULL OR certainty IN ('accepted', 'rejected', 'unknown')),
+                provider_message_id TEXT,
+                retryable INTEGER NOT NULL DEFAULT 0 CHECK(retryable IN (0, 1)),
+                error_class TEXT,
+                error_code TEXT,
+                error_message TEXT,
+                started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                finished_at DATETIME,
+                FOREIGN KEY(outbound_message_id) REFERENCES contact_outbound_messages(id),
+                FOREIGN KEY(provider_config_id) REFERENCES contact_provider_configs(id),
+                UNIQUE(outbound_message_id, attempt_no)
+            )`,
+            `CREATE INDEX IF NOT EXISTS idx_contact_outbound_attempts_message
+                ON contact_outbound_attempts(outbound_message_id, attempt_no)`,
+        ],
+    },
 ]
 
 export const CONTACT_SCHEMA_VERSION = CONTACT_MIGRATIONS.at(-1)?.version || 0

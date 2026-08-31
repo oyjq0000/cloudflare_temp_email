@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { contactApi } from '../../api/contact'
 import { useIsMobile } from '../../utils/composables'
 import ContactMailHtml from './ContactMailHtml.vue'
+import ContactCompose from './ContactCompose.vue'
 
 const props = defineProps({
   domainId: { type: Number, default: null },
@@ -20,6 +21,7 @@ const mailboxes = ref([])
 const items = ref([])
 const nextCursor = ref(null)
 const selected = ref(null)
+const showReply = ref(false)
 const loading = ref(false)
 const detailLoading = ref(false)
 const filters = ref({ domain_id: null, mailbox_id: null, from: '', to: '', subject: '', date_from: '', date_to: '' })
@@ -28,13 +30,13 @@ const copy = computed(() => locale.value === 'zh' ? {
   search: '筛选', reset: '重置', from: '发件人', to: '收件人', subject: '主题',
   domain: '全部 Domain', mailbox: '全部 Mailbox', dateFrom: '起始时间（ISO）', dateTo: '结束时间（ISO）',
   empty: '没有符合条件的邮件', more: '加载更多', noSubject: '（无主题）', raw: '下载原始邮件',
-  read: '标为已读', unread: '标为未读', spam: '移入垃圾邮件', notSpam: '移出垃圾邮件',
+  read: '标为已读', unread: '标为未读', spam: '移入垃圾邮件', notSpam: '移出垃圾邮件', reply: '回复',
   attachments: '附件', bodyUnavailable: '这封邮件没有可显示的正文。', close: '关闭',
 } : {
   search: 'Filter', reset: 'Reset', from: 'From', to: 'To', subject: 'Subject',
   domain: 'All domains', mailbox: 'All mailboxes', dateFrom: 'From date (ISO)', dateTo: 'To date (ISO)',
   empty: 'No messages match these filters', more: 'Load more', noSubject: '(no subject)', raw: 'Download raw message',
-  read: 'Mark read', unread: 'Mark unread', spam: 'Move to spam', notSpam: 'Not spam',
+  read: 'Mark read', unread: 'Mark unread', spam: 'Move to spam', notSpam: 'Not spam', reply: 'Reply',
   attachments: 'Attachments', bodyUnavailable: 'This message has no displayable body.', close: 'Close',
 })
 
@@ -177,6 +179,7 @@ onMounted(async () => {
             <header class="detail-header">
               <div><h2>{{ selected.subject || copy.noSubject }}</h2><p>{{ selected.from_name }} &lt;{{ selected.from_address }}&gt; → {{ selected.to_address }}</p></div>
               <n-space wrap>
+                <n-button size="small" type="primary" @click="showReply = true">{{ copy.reply }}</n-button>
                 <n-button size="small" @click="updateSelected(selected.is_read ? contactApi.markUnread : contactApi.markRead)">{{ selected.is_read ? copy.unread : copy.read }}</n-button>
                 <n-button size="small" @click="updateSelected(selected.folder === 'spam' ? contactApi.markNotSpam : contactApi.markSpam)">{{ selected.folder === 'spam' ? copy.notSpam : copy.spam }}</n-button>
                 <n-button size="small" @click="downloadRaw">{{ copy.raw }}</n-button>
@@ -196,6 +199,7 @@ onMounted(async () => {
         <template v-if="selected">
           <p>{{ selected.from_name }} &lt;{{ selected.from_address }}&gt; → {{ selected.to_address }}</p>
           <n-space wrap class="mobile-actions">
+            <n-button size="small" type="primary" @click="showReply = true">{{ copy.reply }}</n-button>
             <n-button size="small" @click="updateSelected(selected.is_read ? contactApi.markUnread : contactApi.markRead)">{{ selected.is_read ? copy.unread : copy.read }}</n-button>
             <n-button size="small" @click="updateSelected(selected.folder === 'spam' ? contactApi.markNotSpam : contactApi.markSpam)">{{ selected.folder === 'spam' ? copy.notSpam : copy.spam }}</n-button>
             <n-button size="small" @click="downloadRaw">{{ copy.raw }}</n-button>
@@ -206,6 +210,7 @@ onMounted(async () => {
         </template>
       </n-drawer-content>
     </n-drawer>
+    <ContactCompose v-model:show="showReply" :reply-message="selected" />
   </section>
 </template>
 

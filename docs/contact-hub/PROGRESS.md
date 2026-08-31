@@ -66,7 +66,7 @@
 ## Phase 5
 
 - Status: completed.
-- Commit: `feat(contact-providers): add explicit provider configuration` (hash recorded in the Phase 6 update after commit creation).
+- Commit: `c2f10ab` (`feat(contact-providers): add explicit provider configuration`).
 - Files: provider-neutral outbound contract and result classification; Resend, Brevo, SMTP, and Legacy Cloudflare Binding adapters; explicit Contact registry/router; CONTACT-only Secret Resolver; redacted Provider Config CRUD; Domain default Provider binding; Provider management UI and Domain selector; Legacy adapter extraction without changing selection order; local HTTP mocks; and Mailpit-targeted SMTP E2E coverage. See `PROVIDERS.md`.
 - Tests: Worker 29/29; Worker lint pass; explicit Worker dry-run build pass; Frontend 65/65; Frontend production build pass. Local Contact Wrangler suites passed 19 and skipped the one Mailpit-dependent SMTP case because the host Docker daemon remains unavailable. The executed Provider cases prove reference/value redaction, strict `CONTACT_*` validation, missing-secret rejection before network I/O, explicit Domain selection, and prevention of disabling an assigned Provider. HTTP mock unit tests prove Resend Message ID capture plus explicit rejection and uncertain-network classification. The committed Docker case sends SMTP through Mailpit and asserts that a fake global Resend token cannot override the Domain choice.
 - Decisions: Contact Provider selection only reads `contact_domains.default_provider_config_id`; global Temp Mode settings never participate. Resend/Brevo endpoints are fixed, not administrator-supplied URLs. SMTP secrets are required only when a username is configured, allowing credential-free local Mailpit. Provider API responses expose only non-sensitive config and per-key configured booleans; neither Secret References nor values are returned.
@@ -74,7 +74,12 @@
 
 ## Phase 6
 
-- Status: pending.
+- Status: completed.
+- Commit: `feat(contact-outbound): add idempotent delivery state machine` (hash recorded in the Phase 7 update after commit creation).
+- Files: migration 4 for durable outbound intents and append-only attempts; Send/Reply/List/Detail/Retry/Force Resend APIs; strict header/address/body/idempotency validation; locally generated Message-ID; D1 unique idempotency and conflict handling; compare-and-set claims; provider result/state persistence; metadata-only Sent list; Compose, Reply and Sent/Failed/Unknown UI; and state-machine/Mailpit E2E coverage.
+- Tests: Worker 31/31; Worker lint pass; explicit Worker dry-run build pass; Frontend 65/65; Frontend production build pass. Local Contact Wrangler suites passed 24 and skipped two Docker-Mailpit cases. The executed outbound cases prove one attempt under concurrent same-key sends, same-key content conflicts, Sent/Failed/Unknown mapping, provider Message ID storage, append-only attempts, Failed manual Retry, Unknown normal-Retry rejection, confirmed Force Resend with a new row/Message-ID and `force_resend_of_id`, original Unknown immutability, Reply-To precedence, Re prefix normalization, In-Reply-To/References generation, same-Domain From ownership, CRLF rejection, and body-free list payloads. The Docker cases exercise explicit SMTP and raw Reply headers through Mailpit.
+- Decisions: an outbound intent is committed before any provider call. Only a successful expected-state CAS may append an Attempt and invoke a provider. Duplicate Idempotency-Key requests return the existing intent without claiming; reuse with different content is a conflict. Provider result persistence is authoritative; a post-submission storage failure leaves a non-claimable `sending` record for Phase 7 reconciliation rather than risking resend. `unknown` has no Retry path; Force Resend always creates a new linked intent.
+- Remaining risks: Docker must run the two Mailpit assertions, including wire-level Message-ID/In-Reply-To/References, during Phase 8. V1 has no outbound attachments by design. Stale `sending` reconciliation and operational health views arrive in Phase 7.
 
 ## Phase 7
 

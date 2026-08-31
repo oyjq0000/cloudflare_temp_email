@@ -10,6 +10,8 @@ import DomainManager from '../../components/contact/DomainManager.vue'
 import MailboxManager from '../../components/contact/MailboxManager.vue'
 import ContactInbox from '../../components/contact/ContactInbox.vue'
 import ProviderManager from '../../components/contact/ProviderManager.vue'
+import ContactCompose from '../../components/contact/ContactCompose.vue'
+import ContactSent from '../../components/contact/ContactSent.vue'
 import { contactApi } from '../../api/contact'
 
 const { openSettings, userSettings } = useGlobalState()
@@ -25,6 +27,9 @@ const activeSection = ref('inbox')
 const domains = ref([])
 const counts = ref({ inbox: 0, unread: 0, spam: 0 })
 const inboxView = ref({ folder: 'inbox', unreadOnly: false, domainId: null })
+const outboundStatus = ref('sent')
+const outboundCounts = ref({ sent: 0, failed: 0, unknown: 0 })
+const showCompose = ref(false)
 
 const copy = computed(() => locale.value === 'zh' ? {
   title: 'Private Contact Mail Hub',
@@ -32,7 +37,7 @@ const copy = computed(() => locale.value === 'zh' ? {
   migrationTitle: 'Contact 数据库需要初始化',
   migrationBody: '迁移只创建独立的 contact_* 表，不修改上游 db_version。',
   migrate: '执行 Contact Migration',
-  domains: 'Domains', mailboxes: 'Mailboxes', providers: 'Providers', inbox: '收件箱', unread: '未读', spam: '垃圾邮件', sites: '站点', settings: '设置',
+  domains: 'Domains', mailboxes: 'Mailboxes', providers: 'Providers', inbox: '收件箱', unread: '未读', spam: '垃圾邮件', sent: '已发送', failed: '发送失败', unknown: '结果未知', compose: '撰写', sites: '站点', settings: '设置',
   storageOk: 'R2 私有存储正常', storageBad: 'R2 Binding 不可用，入站将使用 D1 兜底',
   advanced: '高级管理',
   logout: '退出',
@@ -44,7 +49,7 @@ const copy = computed(() => locale.value === 'zh' ? {
   migrationTitle: 'Contact database initialization required',
   migrationBody: 'The migration only creates independent contact_* tables and does not modify the upstream db_version.',
   migrate: 'Run Contact Migration',
-  domains: 'Domains', mailboxes: 'Mailboxes', providers: 'Providers', inbox: 'Inbox', unread: 'Unread', spam: 'Spam', sites: 'Sites', settings: 'Settings',
+  domains: 'Domains', mailboxes: 'Mailboxes', providers: 'Providers', inbox: 'Inbox', unread: 'Unread', spam: 'Spam', sent: 'Sent', failed: 'Failed', unknown: 'Unknown', compose: 'Compose', sites: 'Sites', settings: 'Settings',
   storageOk: 'Private R2 storage is available', storageBad: 'R2 binding is unavailable; inbound uses the D1 fallback',
   advanced: 'Advanced admin',
   logout: 'Sign out',
@@ -98,6 +103,11 @@ const openInbox = (folder = 'inbox', unreadOnly = false, domainId = null) => {
   inboxView.value = { folder, unreadOnly, domainId }
 }
 
+const openOutbound = (status) => {
+  activeSection.value = 'outbound'
+  outboundStatus.value = status
+}
+
 const signOut = () => {
   const state = useGlobalState()
   state.adminAuth.value = ''
@@ -132,6 +142,7 @@ onMounted(async () => {
           <n-text depth="3">{{ copy.subtitle }}</n-text>
         </div>
         <n-space>
+          <n-button type="primary" @click="showCompose = true">{{ copy.compose }}</n-button>
           <n-button @click="router.push('/admin')">{{ copy.advanced }}</n-button>
           <n-button tertiary type="warning" @click="signOut">{{ copy.logout }}</n-button>
         </n-space>
@@ -154,6 +165,9 @@ onMounted(async () => {
               <button :class="{ active: activeSection === 'inbox' && inboxView.folder === 'inbox' && !inboxView.unreadOnly && !inboxView.domainId }" @click="openInbox('inbox')"><span>{{ copy.inbox }}</span><n-tag size="small" round>{{ counts.inbox }}</n-tag></button>
               <button :class="{ active: activeSection === 'inbox' && inboxView.unreadOnly }" @click="openInbox('inbox', true)"><span>{{ copy.unread }}</span><n-tag size="small" round type="info">{{ counts.unread }}</n-tag></button>
               <button :class="{ active: activeSection === 'inbox' && inboxView.folder === 'spam' }" @click="openInbox('spam')"><span>{{ copy.spam }}</span><n-tag size="small" round type="warning">{{ counts.spam }}</n-tag></button>
+              <button :class="{ active: activeSection === 'outbound' && outboundStatus === 'sent' }" @click="openOutbound('sent')"><span>{{ copy.sent }}</span><n-tag size="small" round type="success">{{ outboundCounts.sent }}</n-tag></button>
+              <button :class="{ active: activeSection === 'outbound' && outboundStatus === 'failed' }" @click="openOutbound('failed')"><span>{{ copy.failed }}</span><n-tag size="small" round type="error">{{ outboundCounts.failed }}</n-tag></button>
+              <button :class="{ active: activeSection === 'outbound' && outboundStatus === 'unknown' }" @click="openOutbound('unknown')"><span>{{ copy.unknown }}</span><n-tag size="small" round type="warning">{{ outboundCounts.unknown }}</n-tag></button>
             </nav>
             <h3>{{ copy.sites }}</h3>
             <nav><button v-for="domain in domains" :key="domain.id" :class="{ active: activeSection === 'inbox' && inboxView.domainId === domain.id }" @click="openInbox('inbox', false, domain.id)"><span>{{ domain.name }}</span></button></nav>
@@ -174,10 +188,12 @@ onMounted(async () => {
             />
             <DomainManager v-else-if="activeSection === 'domains'" @changed="refreshDomains" />
             <MailboxManager v-else-if="activeSection === 'mailboxes'" />
-            <ProviderManager v-else />
+            <ProviderManager v-else-if="activeSection === 'providers'" />
+            <ContactSent v-else :status="outboundStatus" @counts="value => outboundCounts = value" />
           </div>
         </div>
       </main>
+      <ContactCompose v-model:show="showCompose" />
     </template>
   </div>
 </template>
