@@ -37,6 +37,7 @@
 
 ### Improvements
 
+- docs: |Contact Hub| Add the staging preflight and executable release runbook, covering resource isolation, Secret References, migration/backup/restore, Email Routing/DNS, smoke tests, Go/No-Go gates, and rollback
 - feat: |Send Mail| Improve the information hierarchy and responsive layout of the user and Admin composers, with a content-format toolbar, draft status, bottom send-action area, and isolated HTML preview
 
 ### Testing

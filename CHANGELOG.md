@@ -37,6 +37,7 @@
 
 ### Improvements
 
+- docs: |Contact Hub| 新增 staging 发布前预检与可执行上线 Runbook，明确资源隔离、Secret Reference、迁移/备份/恢复、Email Routing/DNS、smoke、Go/No-Go 和回滚门槛
 - feat: |发信页面| 优化用户和 Admin 发信页面的信息层级与响应式布局，增加正文格式工具栏、草稿状态、底部发送操作区及隔离的 HTML 预览
 
 ### Testing
