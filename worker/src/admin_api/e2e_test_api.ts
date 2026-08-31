@@ -1,5 +1,8 @@
 import { Context } from 'hono'
 import { getBooleanValue } from '../utils'
+import { ContactError, contactErrorResponse, requireContactId } from '../contact/errors'
+import { getProviderConfig } from '../contact/providers/config_service'
+import { sendWithContactProvider } from '../contact/providers/registry'
 
 // Direct DB insert — bypasses the email() handler.
 const seedMail = async (c: Context<HonoCustomType>) => {
@@ -157,4 +160,33 @@ const contactMessage = async (c: Context<HonoCustomType>) => {
     return c.json({ message, count, attachments: results || [], rawObjectStored, attachmentObjectsStored })
 }
 
-export default { seedMail, receiveMail, contactMessage };
+const contactProviderSend = async (c: Context<HonoCustomType>) => {
+    if (!getBooleanValue(c.env.E2E_TEST_MODE)) return c.text('Not available', 404)
+    try {
+        const input = await c.req.json<Record<string, unknown>>()
+        const domainId = requireContactId(String(input.domain_id || ''))
+        const domain = await c.env.DB.prepare(`
+            SELECT default_provider_config_id FROM contact_domains WHERE id = ?
+        `).bind(domainId).first<{ default_provider_config_id: number | null }>()
+        if (!domain) throw new ContactError('CONTACT_DOMAIN_NOT_FOUND', 'Contact Domain was not found', 404)
+        if (!domain.default_provider_config_id) {
+            throw new ContactError('CONTACT_PROVIDER_NOT_ASSIGNED', 'Contact Domain has no Provider Config', 409)
+        }
+        const config = await getProviderConfig(c.env.DB, domain.default_provider_config_id)
+        const result = await sendWithContactProvider(c.env, config, {
+            fromName: typeof input.from_name === 'string' ? input.from_name : '',
+            fromAddress: String(input.from_address || ''),
+            toName: typeof input.to_name === 'string' ? input.to_name : '',
+            toAddress: String(input.to_address || ''),
+            subject: String(input.subject || ''),
+            textBody: typeof input.text_body === 'string' ? input.text_body : undefined,
+            htmlBody: typeof input.html_body === 'string' ? input.html_body : undefined,
+        })
+        return c.json({ ok: true, provider_type: config.providerType, result })
+    } catch (error) {
+        const response = contactErrorResponse(error)
+        return c.json(response.body, response.status)
+    }
+}
+
+export default { seedMail, receiveMail, contactMessage, contactProviderSend };

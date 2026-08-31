@@ -23,6 +23,7 @@ export type ContactDomainInput = {
     inbound_enabled?: unknown
     importance?: unknown
     default_from_name?: unknown
+    default_provider_config_id?: unknown
     create_default_mailbox?: unknown
 }
 
@@ -66,6 +67,19 @@ const normalizeImportance = (value: unknown): string => {
     return value.trim().toLowerCase()
 }
 
+const normalizeProviderId = async (db: D1Database, value: unknown): Promise<number | null> => {
+    if (value === undefined || value === null || value === '') return null
+    const id = Number(value)
+    if (!Number.isInteger(id) || id < 1) {
+        throw new ContactError('CONTACT_INVALID_PROVIDER_ID', 'Provider Config id is invalid')
+    }
+    const provider = await db.prepare(`
+        SELECT id FROM contact_provider_configs WHERE id = ? AND enabled = 1
+    `).bind(id).first<{ id: number }>()
+    if (!provider) throw new ContactError('CONTACT_PROVIDER_UNAVAILABLE', 'Provider Config is not enabled', 409)
+    return id
+}
+
 const getDomainRow = async (db: D1Database, id: number): Promise<ContactDomainRow> => {
     const row = await db.prepare(`
         SELECT d.*,
@@ -97,15 +111,17 @@ export const createDomain = async (db: D1Database, input: ContactDomainInput) =>
     const inboundEnabled = toBooleanInt(input.inbound_enabled, true)
     const importance = normalizeImportance(input.importance)
     const defaultFromName = optionalText(input.default_from_name, 100)
+    const defaultProviderConfigId = await normalizeProviderId(db, input.default_provider_config_id)
     const createDefaultMailbox = toBooleanInt(input.create_default_mailbox, true) === 1
     const defaultAddress = contactAddress('contact', domain)
 
     const statements: D1PreparedStatement[] = [
         db.prepare(`
             INSERT INTO contact_domains(
-                domain, name, enabled, inbound_enabled, importance, default_from_name
-            ) VALUES (?, ?, ?, ?, ?, ?)
-        `).bind(domain, name, enabled, inboundEnabled, importance, defaultFromName),
+                domain, name, enabled, inbound_enabled, importance, default_from_name,
+                default_provider_config_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).bind(domain, name, enabled, inboundEnabled, importance, defaultFromName, defaultProviderConfigId),
     ]
     if (createDefaultMailbox) {
         statements.push(
@@ -176,6 +192,10 @@ export const updateDomain = async (db: D1Database, id: number, input: ContactDom
     if (input.default_from_name !== undefined) {
         assignments.push('default_from_name = ?')
         values.push(optionalText(input.default_from_name, 100))
+    }
+    if (input.default_provider_config_id !== undefined) {
+        assignments.push('default_provider_config_id = ?')
+        values.push(await normalizeProviderId(db, input.default_provider_config_id))
     }
     if (assignments.length === 0) return getDomain(db, id)
 

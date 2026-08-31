@@ -99,6 +99,8 @@ services:
     ports:
       - "8792:8792"
     command: ["pnpm", "exec", "wrangler", "dev", "--port", "8792", "--ip", "0.0.0.0"]
+    depends_on:
+      - mailpit
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8792/health_check"]
       interval: 3s

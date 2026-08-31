@@ -57,7 +57,7 @@
 ## Phase 4
 
 - Status: completed.
-- Commit: `feat(contact-inbox): add unified inbox and safe mail rendering` (hash recorded in the Phase 5 update after commit creation).
+- Commit: `70c15b8` (`feat(contact-inbox): add unified inbox and safe mail rendering`).
 - Files: metadata-only Contact message list service with tuple cursor pagination and server filters; on-demand detail/read/unread/Spam APIs; authenticated private R2/D1-fallback Raw and attachment downloads; safe filename/MIME response headers; Contact sidebar, filters, desktop split view and mobile drawer; unified HTML sanitizer for Contact, Legacy, Sent, Shadow DOM, iframe, and Telegram paths; remote-content consent; and dedicated API/security tests.
 - Tests: Worker 24/24; Worker lint pass; explicit Worker dry-run build pass; Frontend 65/65; Frontend production build pass; Compose configuration pass; Playwright discovery pass. Local Contact Wrangler suites passed 17/17. The four new message cases prove metadata-only list payloads, stable cross-page cursor results, Domain/Mailbox/From/To/Subject/Date filters, detail-only bodies, storage-key/byte redaction, unread and Spam counts/state, authenticated Raw/attachment access, R2 download behavior, path-safe filenames, `nosniff`, private no-store caching, and active MIME coercion.
 - Decisions: list queries never read or parse `raw_mails`; detail loads indexed bodies and attachment metadata only. Remote resources are blocked per message until explicit consent and all HTML remains sanitized after consent. Raw objects and attachment keys never enter JSON responses; downloads are same-origin Admin endpoints. Attachment filenames are metadata only and are reduced to a leaf name for response headers; executable MIME types are served as `application/octet-stream`.
@@ -65,7 +65,12 @@
 
 ## Phase 5
 
-- Status: pending.
+- Status: completed.
+- Commit: `feat(contact-providers): add explicit provider configuration` (hash recorded in the Phase 6 update after commit creation).
+- Files: provider-neutral outbound contract and result classification; Resend, Brevo, SMTP, and Legacy Cloudflare Binding adapters; explicit Contact registry/router; CONTACT-only Secret Resolver; redacted Provider Config CRUD; Domain default Provider binding; Provider management UI and Domain selector; Legacy adapter extraction without changing selection order; local HTTP mocks; and Mailpit-targeted SMTP E2E coverage. See `PROVIDERS.md`.
+- Tests: Worker 29/29; Worker lint pass; explicit Worker dry-run build pass; Frontend 65/65; Frontend production build pass. Local Contact Wrangler suites passed 19 and skipped the one Mailpit-dependent SMTP case because the host Docker daemon remains unavailable. The executed Provider cases prove reference/value redaction, strict `CONTACT_*` validation, missing-secret rejection before network I/O, explicit Domain selection, and prevention of disabling an assigned Provider. HTTP mock unit tests prove Resend Message ID capture plus explicit rejection and uncertain-network classification. The committed Docker case sends SMTP through Mailpit and asserts that a fake global Resend token cannot override the Domain choice.
+- Decisions: Contact Provider selection only reads `contact_domains.default_provider_config_id`; global Temp Mode settings never participate. Resend/Brevo endpoints are fixed, not administrator-supplied URLs. SMTP secrets are required only when a username is configured, allowing credential-free local Mailpit. Provider API responses expose only non-sensitive config and per-key configured booleans; neither Secret References nor values are returned.
+- Remaining risks: the SMTP/Mailpit assertion and complete Legacy delivery regression require the Docker E2E environment in Phase 8. Production Provider Secrets must be added manually after review; none were created or read during this phase.
 
 ## Phase 6
 

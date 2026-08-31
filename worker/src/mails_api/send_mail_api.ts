@@ -1,9 +1,12 @@
 import { Context, Hono } from 'hono'
 import { Jwt } from 'hono/utils/jwt'
 import { createMimeMessage } from 'mimetext';
-import { Resend } from 'resend';
-import { WorkerMailer, WorkerMailerOptions } from 'worker-mailer';
+import { WorkerMailerOptions } from 'worker-mailer';
 
+import { CloudflareBindingProvider } from '../contact/providers/cloudflare_binding';
+import { ResendProvider } from '../contact/providers/resend';
+import { SmtpProvider } from '../contact/providers/smtp';
+import type { OutboundMessage, ProviderSendResult } from '../contact/providers/types';
 import i18n from '../i18n';
 import { CONSTANTS } from '../constants'
 import { getJsonSetting, getDomains, getBooleanValue, getJsonObjectValue, getDomainMapValue, getMailDomain, includesDomain } from '../utils';
@@ -66,12 +69,26 @@ export const sendMailByBinding = async (
         from_name, to_mail, to_name,
         subject, content, is_html
     } = reqJson;
-    await c.env.SEND_MAIL.send({
-        from: from_name ? { email: address, name: from_name } : address,
-        to: to_name ? [`${to_name} <${to_mail}>`] : [to_mail],
-        subject,
-        ...(is_html ? { html: content } : { text: content }),
-    });
+    const provider = new CloudflareBindingProvider(message => c.env.SEND_MAIL.send(message));
+    ensureLegacyAccepted(await provider.send(providerMessage(address, reqJson)));
+}
+
+const providerMessage = (
+    address: string,
+    reqJson: { from_name: string, to_mail: string, to_name: string, subject: string, content: string, is_html: boolean },
+): OutboundMessage => ({
+    fromName: reqJson.from_name,
+    fromAddress: address,
+    toName: reqJson.to_name,
+    toAddress: reqJson.to_mail,
+    subject: reqJson.subject,
+    ...(reqJson.is_html ? { htmlBody: reqJson.content } : { textBody: reqJson.content }),
+})
+
+const ensureLegacyAccepted = (result: ProviderSendResult) => {
+    if (result.certainty !== 'accepted') {
+        throw new Error(`${result.errorCode || 'PROVIDER_FAILED'}: ${result.errorMessage || 'Provider failed'}`)
+    }
 }
 
 const sendMailByResend = async (
@@ -85,21 +102,9 @@ const sendMailByResend = async (
     const token = c.env[
         `RESEND_TOKEN_${mailDomain.replace(/\./g, "_").toUpperCase()}`
     ] || c.env.RESEND_TOKEN;
-    const resend = new Resend(token);
-    const { data, error } = await resend.emails.send({
-        from: reqJson.from_name ? `${reqJson.from_name} <${address}>` : address,
-        to: reqJson.to_name ? `${reqJson.to_name} <${reqJson.to_mail}>` : reqJson.to_mail,
-        subject: reqJson.subject,
-        ...(reqJson.is_html ? {
-            html: reqJson.content,
-        } : {
-            text: reqJson.content,
-        })
-    });
-    if (error) {
-        throw new Error(`Resend error: ${error.name} ${error.message}`);
-    }
-    console.log(`Resend success: ${JSON.stringify(data)}`);
+    ensureLegacyAccepted(await new ResendProvider().send(providerMessage(address, reqJson), {
+        config: {}, secrets: { apiKey: String(token) },
+    }));
 }
 
 const sendMailBySmtp = async (
@@ -110,22 +115,18 @@ const sendMailBySmtp = async (
     },
     smtpOptions: WorkerMailerOptions
 ): Promise<void> => {
-    await WorkerMailer.send(
-        smtpOptions,
-        {
-            from: {
-                name: reqJson.from_name,
-                email: address
-            },
-            to: {
-                name: reqJson.to_name,
-                email: reqJson.to_mail
-            },
-            subject: reqJson.subject,
-            text: reqJson.is_html ? undefined : reqJson.content,
-            html: reqJson.is_html ? reqJson.content : undefined
-        }
-    )
+    ensureLegacyAccepted(await new SmtpProvider().send(providerMessage(address, reqJson), {
+        config: {
+            host: smtpOptions.host,
+            port: smtpOptions.port,
+            secure: smtpOptions.secure,
+            starttls: smtpOptions.startTls,
+            username: smtpOptions.credentials?.username,
+            socket_timeout_ms: smtpOptions.socketTimeoutMs,
+            response_timeout_ms: smtpOptions.responseTimeoutMs,
+        },
+        secrets: smtpOptions.credentials?.password ? { password: smtpOptions.credentials.password } : {},
+    }))
 }
 
 export const sendMail = async (

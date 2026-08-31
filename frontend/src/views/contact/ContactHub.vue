@@ -9,6 +9,7 @@ import ContactLogin from './ContactLogin.vue'
 import DomainManager from '../../components/contact/DomainManager.vue'
 import MailboxManager from '../../components/contact/MailboxManager.vue'
 import ContactInbox from '../../components/contact/ContactInbox.vue'
+import ProviderManager from '../../components/contact/ProviderManager.vue'
 import { contactApi } from '../../api/contact'
 
 const { openSettings, userSettings } = useGlobalState()
@@ -31,7 +32,7 @@ const copy = computed(() => locale.value === 'zh' ? {
   migrationTitle: 'Contact 数据库需要初始化',
   migrationBody: '迁移只创建独立的 contact_* 表，不修改上游 db_version。',
   migrate: '执行 Contact Migration',
-  domains: 'Domains', mailboxes: 'Mailboxes', inbox: '收件箱', unread: '未读', spam: '垃圾邮件', sites: '站点', settings: '设置',
+  domains: 'Domains', mailboxes: 'Mailboxes', providers: 'Providers', inbox: '收件箱', unread: '未读', spam: '垃圾邮件', sites: '站点', settings: '设置',
   storageOk: 'R2 私有存储正常', storageBad: 'R2 Binding 不可用，入站将使用 D1 兜底',
   advanced: '高级管理',
   logout: '退出',
@@ -43,7 +44,7 @@ const copy = computed(() => locale.value === 'zh' ? {
   migrationTitle: 'Contact database initialization required',
   migrationBody: 'The migration only creates independent contact_* tables and does not modify the upstream db_version.',
   migrate: 'Run Contact Migration',
-  domains: 'Domains', mailboxes: 'Mailboxes', inbox: 'Inbox', unread: 'Unread', spam: 'Spam', sites: 'Sites', settings: 'Settings',
+  domains: 'Domains', mailboxes: 'Mailboxes', providers: 'Providers', inbox: 'Inbox', unread: 'Unread', spam: 'Spam', sites: 'Sites', settings: 'Settings',
   storageOk: 'Private R2 storage is available', storageBad: 'R2 binding is unavailable; inbound uses the D1 fallback',
   advanced: 'Advanced admin',
   logout: 'Sign out',
@@ -160,6 +161,7 @@ onMounted(async () => {
             <nav>
               <button :class="{ active: activeSection === 'domains' }" @click="activeSection = 'domains'"><span>{{ copy.domains }}</span></button>
               <button :class="{ active: activeSection === 'mailboxes' }" @click="activeSection = 'mailboxes'"><span>{{ copy.mailboxes }}</span></button>
+              <button :class="{ active: activeSection === 'providers' }" @click="activeSection = 'providers'"><span>{{ copy.providers }}</span></button>
             </nav>
           </aside>
           <div class="hub-content">
@@ -171,7 +173,8 @@ onMounted(async () => {
               @counts="value => counts = value"
             />
             <DomainManager v-else-if="activeSection === 'domains'" @changed="refreshDomains" />
-            <MailboxManager v-else />
+            <MailboxManager v-else-if="activeSection === 'mailboxes'" />
+            <ProviderManager v-else />
           </div>
         </div>
       </main>

@@ -17,6 +17,7 @@ DEFAULT_SEND_BALANCE = 10
 ADMIN_PASSWORDS = ["e2e-contact-admin"]
 DISABLE_ADMIN_PASSWORD_CHECK = false
 E2E_TEST_MODE = true
+RESEND_TOKEN = "e2e-global-must-not-win"
 
 [[kv_namespaces]]
 binding = "KV"

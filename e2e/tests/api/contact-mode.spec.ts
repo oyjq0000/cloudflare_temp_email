@@ -62,7 +62,7 @@ test.describe('Contact Mode capability gates', () => {
       ok: true,
       mode: 'contact',
       adminSecurity: { secure: true, code: 'OK' },
-      phase: 4,
+      phase: 5,
     });
   });
 });

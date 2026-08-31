@@ -113,3 +113,4 @@ api.post('/admin/ai_extract/settings', ai_extract_settings.saveAiExtractSettings
 api.post('/admin/test/seed_mail', e2e_test_api.seedMail)
 api.post('/admin/test/receive_mail', e2e_test_api.receiveMail)
 api.get('/admin/test/contact_message', e2e_test_api.contactMessage)
+api.post('/admin/test/contact_provider_send', e2e_test_api.contactProviderSend)

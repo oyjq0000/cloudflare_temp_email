@@ -29,6 +29,8 @@ Implemented migration versions:
 | 2 | `contact_inbound_message_storage` | `contact_messages`, `contact_attachments`, dedupe/Legacy links, inbox indexes, and per-object storage state |
 | 3 | `contact_inbound_truncation_signal` | Explicit `contact_messages.content_truncated` signal for bounded D1 body indexing |
 
+Provider Config CRUD and Domain assignment are implemented on the version 1 tables. API serialization exposes non-secret configuration and per-secret configured booleans, never `secret_refs_json` or resolved values.
+
 The authenticated endpoints are `GET /admin/contact/db/version` and `POST /admin/contact/db/migrate`. Running the latter repeatedly is a no-op after the current target has been recorded.
 
 ## Core entities

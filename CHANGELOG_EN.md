@@ -14,6 +14,7 @@
 - feat: |Contact Hub| Add independent numeric migrations, Domain/Mailbox management APIs and a private management UI; atomically synchronize fixed Mailboxes to upstream `address` rows and use soft disable for Domain/Mailbox removal
 - feat: |Contact Hub| Add fixed-Mailbox inbound ingestion, single-pass MIME indexing, Message-ID/raw-SHA256 dedupe, Spam retention, private R2 raw/attachment storage, and storage health/repair APIs
 - feat: |Contact Hub| Add the unified inbox, server-side filtering and cursor pagination, on-demand message details, read/Spam state, and authenticated raw/attachment downloads
+- feat: |Contact Hub| Add Resend/Brevo/SMTP Provider contracts, a registry, Secret Resolver, config CRUD/UI, and explicit Domain assignment while preserving the Legacy provider order
 - feat: |Admin| Add D1 storage capacity details to the database page, with persistent Free and Workers Paid plan selection and a comparison between the current database size and capacity limit
 - feat: |Admin| Add one-click random email-name generation to the address creation page (issue #1126)
 - feat: |User| Add mail composition, inbox-style sent-item filtering by bound address, and the shared address-credentials dialog to the user center, backed by User JWT APIs for address settings, send-access requests, sending, and sent-item management
@@ -37,6 +38,7 @@
 - test: |Contact Hub| Cover migration idempotency and upstream-version isolation, Domain/Mailbox constraints, address synchronization, 50 Domains, public-config redaction, and Legacy Cleanup protection
 - test: |Contact Hub| Cover Plain/HTML/Multipart/CID/attachment ingestion, both dedupe paths, R2 success/failure/repair, zero side effects on D1 failure, Spam, and unknown recipients
 - test: |Contact Hub| Cover cross-page message filtering, list/detail payload boundaries, unread and Spam state, remote-tracker blocking, and authenticated raw/attachment safety headers
+- test: |Contact Hub| Use HTTP mocks for Resend/Brevo message ids and error classification, cover zero calls on missing secrets and redacted explicit Provider assignment, and add a Mailpit SMTP delivery case
 - test: |E2E| Cover the D1 database-size response, config-key isolation, and persistence of the database-page plan selection across reloads
 - fix: |E2E| Cover draft editing, content-format switching, and HTML preview in the send-mail composer
 - fix: |E2E| Cover address ownership, balance decrement, delivery, and sent-item operations through the User JWT API, plus user-center credential display, sender switching, and sent-item filtering by address

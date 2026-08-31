@@ -14,6 +14,7 @@
 - feat: |Contact Hub| 新增独立数字迁移、Domain/Mailbox 管理 API 与私有管理界面；固定 Mailbox 原子同步到上游 `address`，Domain/Mailbox 停用采用 soft disable
 - feat: |Contact Hub| 新增固定 Mailbox 入站、单次 MIME 索引、Message-ID/raw SHA-256 去重、Spam 留存、私有 R2 原始邮件与附件存储，以及存储状态/修复 API
 - feat: |Contact Hub| 新增统一收件箱、服务端过滤与 cursor pagination、按需邮件详情、已读/Spam 状态，以及鉴权 Raw/附件下载
+- feat: |Contact Hub| 新增 Resend/Brevo/SMTP Provider contract、Registry、Secret Resolver、配置 CRUD/UI 和 Domain 显式 Provider 绑定，并保持 Legacy Provider 选择顺序
 - feat: |Admin| 数据库页面新增 D1 存储容量展示，支持选择并保存 Free 或 Workers Paid 套餐，对比当前数据库大小和容量上限
 - feat: |Admin| 创建邮箱页面支持一键生成随机邮箱名称（issue #1126）
 - feat: |用户系统| 用户中心新增发送邮件、与收件箱一致的可按绑定地址过滤的发件箱，以及地址管理凭证弹框；提供使用用户 JWT 的地址设置、发信权限申请、发信及发件箱 API
@@ -37,6 +38,7 @@
 - test: |Contact Hub| 覆盖迁移幂等及上游版本隔离、Domain/Mailbox 约束、地址同步、50 Domain、公开配置脱敏和 Legacy Cleanup 保护
 - test: |Contact Hub| 覆盖 Plain/HTML/Multipart/CID/附件入站、两种去重、R2 成功/故障/修复、D1 失败零副作用、Spam 与未知收件人
 - test: |Contact Hub| 覆盖跨页消息过滤、列表/详情载荷边界、未读与 Spam 状态、远程追踪器阻止，以及 Raw/附件鉴权和安全下载头
+- test: |Contact Hub| 使用 HTTP mock 覆盖 Resend/Brevo Message ID 与错误分类，覆盖缺 Secret 零调用、Provider 配置脱敏/显式绑定，并增加 Mailpit SMTP 投递用例
 - test: |E2E| 覆盖 D1 数据库大小响应、配置键隔离，以及数据库页面套餐选择的持久化与刷新恢复
 - fix: |E2E| 覆盖发信页面草稿编辑、正文格式切换及 HTML 预览
 - fix: |E2E| 覆盖用户 JWT 发信接口的地址归属、额度扣减、实际投递和发件箱操作，以及用户中心查看地址凭证、切换发件地址和按地址过滤发件箱的完整流程
