@@ -1,10 +1,11 @@
 <template>
-    <div v-if="useFallback" v-html="htmlContent"></div>
+    <div v-if="useFallback" v-html="safeHtml"></div>
     <div v-else ref="shadowHost"></div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue';
+import { sanitizeMailHtml } from '../utils/remote-content-policy';
 
 const props = defineProps({
     htmlContent: {
@@ -15,7 +16,15 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    allowRemoteContent: {
+        type: Boolean,
+        default: true,
+    },
 });
+
+const safeHtml = computed(() => sanitizeMailHtml(props.htmlContent, {
+    allowRemoteContent: props.allowRemoteContent,
+}).html);
 
 const shadowHost = ref(null);
 let shadowRoot = null;
@@ -50,7 +59,7 @@ const renderShadowDom = () => {
                     a { color: #A8C7FA; }
                    </style>`
                 : '';
-            shadowRoot.innerHTML = darkModeStyle + props.htmlContent;
+            shadowRoot.innerHTML = darkModeStyle + safeHtml.value;
         }
     } catch (error) {
         console.error('Failed to render Shadow DOM, falling back to v-html:', error);
@@ -79,7 +88,7 @@ onBeforeUnmount(() => {
 });
 
 // Update Shadow DOM when htmlContent or dark mode changes
-watch(() => [props.htmlContent, props.isDark], () => {
+watch(() => [props.htmlContent, props.isDark, props.allowRemoteContent], () => {
     renderShadowDom();
 }, { flush: 'post' });
 </script>

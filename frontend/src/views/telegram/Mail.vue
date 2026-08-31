@@ -3,14 +3,18 @@ import { useRoute } from 'vue-router'
 
 import { useGlobalState } from '../../store'
 import { api } from '../../api'
-import { onMounted, watch } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { processItem } from '../../utils/email-parser'
 import { utcToLocalDate } from '../../utils';
+import { sanitizeMailHtml } from '../../utils/remote-content-policy';
 
 const { telegramApp, loading, useUTCDate } = useGlobalState()
 const route = useRoute()
 
 const curMail = ref({});
+const safeMailHtml = computed(() => sanitizeMailHtml(curMail.value.message, {
+    allowRemoteContent: false,
+}).html);
 
 watch(telegramApp, async () => {
     if (telegramApp.value.initData) {
@@ -59,7 +63,8 @@ onMounted(async () => {
             <n-tag v-if="showEMailTo" type="info">
                 TO: {{ curMail.address }}
             </n-tag>
-            <iframe :srcdoc="curMail.message" style="margin-top: 10px;width: 100%; height: 100%;">
+            <iframe :srcdoc="safeMailHtml" sandbox="" referrerpolicy="no-referrer"
+                style="margin-top: 10px;width: 100%; height: 100%;">
             </iframe>
         </n-card>
     </div>

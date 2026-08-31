@@ -23,7 +23,7 @@ const FORBIDDEN = [
 // cid: attachments into blob: URLs -- without this every inline image would be
 // stripped along with the trackers.
 const ALLOWED_URI_REGEXP =
-    /^(?:(?:https?|mailto|tel|callto|sms|cid|xmpp|blob|data):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i;
+    /^(?:(?:https?|mailto|tel|callto|sms|cid|xmpp|blob):|data:image\/|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i;
 
 // CSS constructs that can load a resource. @import is listed because it also
 // accepts a bare string -- `@import "https://..."` fetches without any url().
@@ -124,6 +124,7 @@ function blockCssUrls(cssText, onBlocked) {
 }
 
 let purifier = null;
+let remoteAllowedPurifier = null;
 let blockedCount = 0;
 
 /**
@@ -217,4 +218,29 @@ export function blockRemoteContent(html) {
     });
 
     return { html: sanitised, blocked: blockedCount };
+}
+
+/**
+ * The only supported HTML-mail sanitization entry point. Remote-content
+ * consent changes URL filtering only; executable markup is removed in both
+ * modes.
+ *
+ * @param {string} html
+ * @param {{ allowRemoteContent?: boolean }} policy
+ * @returns {{ html: string, blocked: number }}
+ */
+export function sanitizeMailHtml(html, policy = {}) {
+    if (!policy.allowRemoteContent) return blockRemoteContent(html);
+    if (!html || typeof html !== 'string') return { html: '', blocked: 0 };
+    if (!remoteAllowedPurifier) remoteAllowedPurifier = DOMPurify(window);
+    return {
+        html: remoteAllowedPurifier.sanitize(html, {
+            FORBID_TAGS: FORBIDDEN,
+            ADD_TAGS: ['style'],
+            FORCE_BODY: true,
+            ALLOWED_URI_REGEXP,
+            ALLOW_DATA_ATTR: true,
+        }),
+        blocked: 0,
+    };
 }

@@ -49,6 +49,7 @@ const apiFetch = async (path, options = {}) => {
             method: options.method || 'GET',
             data: options.body || null,
             headers,
+            responseType: options.responseType,
         });
         if (response.status === 401 && path.startsWith("/admin")) {
             showAdminAuth.value = true;
@@ -57,7 +58,8 @@ const apiFetch = async (path, options = {}) => {
             showAuth.value = true;
         }
         if (response.status >= 300) {
-            throw new Error(`[${response.status}]: ${response.data}` || "error");
+            const detail = response.data?.error?.message || response.data?.message || response.data;
+            throw new Error(`[${response.status}]: ${typeof detail === 'string' ? detail : 'Request failed'}`);
         }
         const data = response.data;
         return data;

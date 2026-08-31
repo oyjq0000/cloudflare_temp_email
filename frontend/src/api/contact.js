@@ -1,6 +1,14 @@
 import { api } from './index'
 
 const jsonBody = (body) => JSON.stringify(body)
+const queryString = (params = {}) => {
+  const query = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') query.set(key, String(value))
+  })
+  const encoded = query.toString()
+  return encoded ? `?${encoded}` : ''
+}
 
 export const contactApi = {
   getMigrationStatus: () => api.fetch('/admin/contact/db/version'),
@@ -31,4 +39,13 @@ export const contactApi = {
     body: jsonBody(input),
   }),
   disableMailbox: (id) => api.fetch(`/admin/contact/mailboxes/${id}`, { method: 'DELETE' }),
+
+  listMessages: (params) => api.fetch(`/admin/contact/messages${queryString(params)}`),
+  getMessage: (id) => api.fetch(`/admin/contact/messages/${id}`),
+  markRead: (id) => api.fetch(`/admin/contact/messages/${id}/read`, { method: 'POST' }),
+  markUnread: (id) => api.fetch(`/admin/contact/messages/${id}/unread`, { method: 'POST' }),
+  markSpam: (id) => api.fetch(`/admin/contact/messages/${id}/spam`, { method: 'POST' }),
+  markNotSpam: (id) => api.fetch(`/admin/contact/messages/${id}/not-spam`, { method: 'POST' }),
+  downloadRaw: (id) => api.fetch(`/admin/contact/messages/${id}/raw`, { responseType: 'blob' }),
+  downloadAttachment: (id) => api.fetch(`/admin/contact/attachments/${id}`, { responseType: 'blob' }),
 }

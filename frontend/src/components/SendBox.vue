@@ -6,6 +6,7 @@ import { useGlobalState } from '../store'
 import { useIsMobile } from '../utils/composables'
 import { utcToLocalDate } from '../utils';
 import { SendRound } from '@vicons/material'
+import ShadowHtmlComponent from './ShadowHtmlComponent.vue'
 
 const message = useMessage()
 const isMobile = useIsMobile()
@@ -273,7 +274,7 @@ onMounted(async () => {
             </n-space>
             <pre v-if="showCode" style="margin-top: 10px;">{{ curMail.raw }}</pre>
             <pre v-else-if="!curMail.is_html" style="margin-top: 10px;">{{ curMail.content }}</pre>
-            <div v-else v-html="curMail.content" style="margin-top: 10px;"></div>
+            <ShadowHtmlComponent v-else :html-content="curMail.content || ''" style="margin-top: 10px;" />
           </n-card>
           <n-card :bordered="false" embedded class="mail-item" v-else>
             <n-result status="info" :title="count === 0 ? t('emptySent') : t('pleaseSelectMail')">
@@ -345,7 +346,7 @@ onMounted(async () => {
             </n-space>
             <pre v-if="showCode" style="margin-top: 10px;">{{ curMail.raw }}</pre>
             <pre v-else-if="!curMail.is_html" style="margin-top: 10px;">{{ curMail.content }}</pre>
-            <div v-else v-html="curMail.content" style="margin-top: 10px;"></div>
+            <ShadowHtmlComponent v-else :html-content="curMail.content || ''" style="margin-top: 10px;" />
           </n-card>
         </n-drawer-content>
       </n-drawer>

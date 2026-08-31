@@ -5,7 +5,7 @@ import { CloudDownloadRound, ReplyFilled, ForwardFilled, FullscreenRound, ImageR
 import ShadowHtmlComponent from "./ShadowHtmlComponent.vue";
 import AiExtractInfo from "./AiExtractInfo.vue";
 import { getDownloadEmlUrl } from '../utils/email-parser';
-import { blockRemoteContent } from '../utils/remote-content-policy';
+import { sanitizeMailHtml } from '../utils/remote-content-policy';
 import { utcToLocalDate } from '../utils';
 import { useGlobalState } from '../store';
 
@@ -68,10 +68,9 @@ watch(() => props.mail.id, () => {
 });
 
 const processedMail = computed(() => {
-  if (autoLoadRemoteImages.value || showRemoteImages.value) {
-    return { message: props.mail.message, blocked: 0 };
-  }
-  const { html, blocked } = blockRemoteContent(props.mail.message);
+  const { html, blocked } = sanitizeMailHtml(props.mail.message, {
+    allowRemoteContent: autoLoadRemoteImages.value || showRemoteImages.value,
+  });
   return { message: html, blocked };
 });
 
@@ -193,7 +192,7 @@ const handleSaveToS3 = async (filename, blob) => {
     <!-- 邮件内容 -->
     <div class="mail-content" :class="{ 'dark-mode': isDark }">
       <pre v-if="showTextMail" class="mail-text">{{ mail.text }}</pre>
-      <iframe v-else-if="useIframeShowMail" :srcdoc="processedMail.message" class="mail-iframe">
+      <iframe v-else-if="useIframeShowMail" :srcdoc="processedMail.message" sandbox="" referrerpolicy="no-referrer" class="mail-iframe">
       </iframe>
       <ShadowHtmlComponent v-else :key="mail.id" :htmlContent="processedMail.message" :isDark="isDark" class="mail-html" />
     </div>
@@ -204,7 +203,7 @@ const handleSaveToS3 = async (filename, blob) => {
     <n-drawer-content :title="mail.subject" closable>
       <div class="fullscreen-mail-content" :class="{ 'dark-mode': isDark }">
         <pre v-if="showTextMail" class="mail-text">{{ mail.text }}</pre>
-        <iframe v-else-if="useIframeShowMail" :srcdoc="processedMail.message" class="mail-iframe">
+        <iframe v-else-if="useIframeShowMail" :srcdoc="processedMail.message" sandbox="" referrerpolicy="no-referrer" class="mail-iframe">
         </iframe>
         <ShadowHtmlComponent v-else :key="mail.id" :htmlContent="processedMail.message" :isDark="isDark" class="mail-html" />
       </div>

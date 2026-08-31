@@ -48,7 +48,7 @@
 ## Phase 3
 
 - Status: completed.
-- Commit: `feat(contact-inbound): add indexed inbound ingestion and R2 storage` (hash recorded in the Phase 4 update after commit creation).
+- Commit: `1f2d652` (`feat(contact-inbound): add indexed inbound ingestion and R2 storage`).
 - Files: Contact migrations 2-3 for message/attachment indexes and truncation visibility; fixed-recipient Contact ingress; single-pass PostalMime parsing; Message-ID and raw-SHA256 dedupe; atomic D1 business/Legacy fallback persistence; private R2 object store with server-generated keys and checksums; storage status/repair API and Hub status; local R2 binding fixture; bilingual binding docs; and Contact inbound E2E coverage.
 - Tests: Worker 20/20; Worker lint pass; explicit Worker dry-run build pass; Frontend 63/63; Frontend production build pass; Compose configuration pass. Local Contact Wrangler suites passed 13/13. The six inbound cases prove Plain/HTML/Multipart/CID/Attachment parsing, D1 metadata without attachment bytes, raw/attachment R2 writes, Message-ID and no-Message-ID dedupe, R2 failure fallback plus repair, D1 failure with no forward/reply side effects, Spam persistence, unknown-recipient rejection, and authenticated storage health.
 - Decisions: Contact ingress validates enabled Domain and Mailbox rows instead of `DOMAINS`; hard blacklist remains a pre-ingest rejection; junk classification maps to the Spam folder. D1 is committed before any external side effect. Raw EML and attachments use private, server-generated R2 keys; user filenames are metadata only. Raw D1 fallback is bounded at 1.5 MB, parsed bodies at 512k characters each, and truncation is explicit. Missing R2 uses `fallback`; partial/missing object writes use `degraded`; complete object persistence uses `stored`.
@@ -56,7 +56,12 @@
 
 ## Phase 4
 
-- Status: pending.
+- Status: completed.
+- Commit: `feat(contact-inbox): add unified inbox and safe mail rendering` (hash recorded in the Phase 5 update after commit creation).
+- Files: metadata-only Contact message list service with tuple cursor pagination and server filters; on-demand detail/read/unread/Spam APIs; authenticated private R2/D1-fallback Raw and attachment downloads; safe filename/MIME response headers; Contact sidebar, filters, desktop split view and mobile drawer; unified HTML sanitizer for Contact, Legacy, Sent, Shadow DOM, iframe, and Telegram paths; remote-content consent; and dedicated API/security tests.
+- Tests: Worker 24/24; Worker lint pass; explicit Worker dry-run build pass; Frontend 65/65; Frontend production build pass; Compose configuration pass; Playwright discovery pass. Local Contact Wrangler suites passed 17/17. The four new message cases prove metadata-only list payloads, stable cross-page cursor results, Domain/Mailbox/From/To/Subject/Date filters, detail-only bodies, storage-key/byte redaction, unread and Spam counts/state, authenticated Raw/attachment access, R2 download behavior, path-safe filenames, `nosniff`, private no-store caching, and active MIME coercion.
+- Decisions: list queries never read or parse `raw_mails`; detail loads indexed bodies and attachment metadata only. Remote resources are blocked per message until explicit consent and all HTML remains sanitized after consent. Raw objects and attachment keys never enter JSON responses; downloads are same-origin Admin endpoints. Attachment filenames are metadata only and are reduced to a leaf name for response headers; executable MIME types are served as `application/octet-stream`.
+- Remaining risks: a real browser session against the Contact Hub still depends on the unavailable Docker daemon for the complete containerized UI suite. Local unit tests prove sanitizer behavior and the production frontend build succeeds; full Docker/browser confirmation remains a Phase 8 gate.
 
 ## Phase 5
 

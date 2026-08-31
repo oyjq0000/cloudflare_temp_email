@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { blockRemoteContent } from '../remote-content-policy';
+import { blockRemoteContent, sanitizeMailHtml } from '../remote-content-policy';
 
 const T = 'https://tracker.example/p.png';
 
@@ -117,5 +117,29 @@ describe('危險導航協議', () => {
         const node = host.querySelector(selector);
         expect(node).not.toBeNull();
         expect(node.hasAttribute('href')).toBe(false);
+    });
+});
+
+describe('unified mail HTML sanitization', () => {
+    it('blocks tracking pixels and remote CSS by default', () => {
+        const result = sanitizeMailHtml(
+            `<img width="1" height="1" src="${T}"><div style="background:url(${T})">x</div>`
+        );
+        expect(result.blocked).toBe(2);
+        expect(result.html).not.toContain('tracker.example');
+    });
+
+    it('keeps sanitization active after remote-image opt-in', () => {
+        const result = sanitizeMailHtml(`
+            <base href="https://evil.example/">
+            <meta http-equiv="refresh" content="0;url=https://evil.example/">
+            <script>alert(1)</script>
+            <iframe srcdoc="<script>alert(1)</script>"></iframe>
+            <svg onload="alert(1)"><a href="javascript:alert(1)">x</a></svg>
+            <img src="${T}" onerror="alert(1)">
+            <a href="data:text/html,<script>alert(1)</script>">bad</a>
+        `, { allowRemoteContent: true });
+        expect(result.html).toContain(T);
+        expect(result.html).not.toMatch(/<script|<iframe|<meta|<base|onerror|onload|javascript:|data:text\/html/i);
     });
 });

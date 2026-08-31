@@ -8,6 +8,7 @@ import { useGlobalState } from '../../store'
 import ContactLogin from './ContactLogin.vue'
 import DomainManager from '../../components/contact/DomainManager.vue'
 import MailboxManager from '../../components/contact/MailboxManager.vue'
+import ContactInbox from '../../components/contact/ContactInbox.vue'
 import { contactApi } from '../../api/contact'
 
 const { openSettings, userSettings } = useGlobalState()
@@ -19,7 +20,10 @@ const loadingStatus = ref(false)
 const migration = ref(null)
 const migrating = ref(false)
 const storage = ref(null)
-const activeSection = ref('domains')
+const activeSection = ref('inbox')
+const domains = ref([])
+const counts = ref({ inbox: 0, unread: 0, spam: 0 })
+const inboxView = ref({ folder: 'inbox', unreadOnly: false, domainId: null })
 
 const copy = computed(() => locale.value === 'zh' ? {
   title: 'Private Contact Mail Hub',
@@ -27,7 +31,7 @@ const copy = computed(() => locale.value === 'zh' ? {
   migrationTitle: 'Contact 数据库需要初始化',
   migrationBody: '迁移只创建独立的 contact_* 表，不修改上游 db_version。',
   migrate: '执行 Contact Migration',
-  domains: 'Domains', mailboxes: 'Mailboxes', inbox: 'Inbox', inboxPending: 'Unified Inbox 将在 Phase 4 接入。',
+  domains: 'Domains', mailboxes: 'Mailboxes', inbox: '收件箱', unread: '未读', spam: '垃圾邮件', sites: '站点', settings: '设置',
   storageOk: 'R2 私有存储正常', storageBad: 'R2 Binding 不可用，入站将使用 D1 兜底',
   advanced: '高级管理',
   logout: '退出',
@@ -39,7 +43,7 @@ const copy = computed(() => locale.value === 'zh' ? {
   migrationTitle: 'Contact database initialization required',
   migrationBody: 'The migration only creates independent contact_* tables and does not modify the upstream db_version.',
   migrate: 'Run Contact Migration',
-  domains: 'Domains', mailboxes: 'Mailboxes', inbox: 'Inbox', inboxPending: 'Unified Inbox is added in Phase 4.',
+  domains: 'Domains', mailboxes: 'Mailboxes', inbox: 'Inbox', unread: 'Unread', spam: 'Spam', sites: 'Sites', settings: 'Settings',
   storageOk: 'Private R2 storage is available', storageBad: 'R2 binding is unavailable; inbound uses the D1 fallback',
   advanced: 'Advanced admin',
   logout: 'Sign out',
@@ -58,7 +62,13 @@ const loadStatus = async () => {
   try {
     status.value = await api.fetch('/admin/contact/status')
     migration.value = await contactApi.getMigrationStatus()
-    if (!migration.value.pending?.length) storage.value = await contactApi.getStorageStatus()
+    if (!migration.value.pending?.length) {
+      const [storageResult, domainResult] = await Promise.all([
+        contactApi.getStorageStatus(), contactApi.listDomains(),
+      ])
+      storage.value = storageResult
+      domains.value = domainResult.results || []
+    }
     authorized.value = true
   } catch {
     authorized.value = false
@@ -72,9 +82,19 @@ const migrate = async () => {
   try {
     migration.value = await contactApi.migrate()
     storage.value = await contactApi.getStorageStatus()
+    domains.value = (await contactApi.listDomains()).results || []
   } finally {
     migrating.value = false
   }
+}
+
+const refreshDomains = async () => {
+  domains.value = (await contactApi.listDomains()).results || []
+}
+
+const openInbox = (folder = 'inbox', unreadOnly = false, domainId = null) => {
+  activeSection.value = 'inbox'
+  inboxView.value = { folder, unreadOnly, domainId }
 }
 
 const signOut = () => {
@@ -127,11 +147,33 @@ onMounted(async () => {
             <template #footer><n-button type="primary" :loading="migrating" @click="migrate">{{ copy.migrate }}</n-button></template>
           </n-result>
         </n-card>
-        <n-tabs v-else v-model:value="activeSection" type="segment" animated>
-          <n-tab-pane name="domains" :tab="copy.domains"><DomainManager /></n-tab-pane>
-          <n-tab-pane name="mailboxes" :tab="copy.mailboxes"><MailboxManager /></n-tab-pane>
-          <n-tab-pane name="inbox" :tab="copy.inbox"><n-card><n-empty :description="copy.inboxPending" /></n-card></n-tab-pane>
-        </n-tabs>
+        <div v-else class="hub-workspace">
+          <aside class="hub-sidebar">
+            <nav>
+              <button :class="{ active: activeSection === 'inbox' && inboxView.folder === 'inbox' && !inboxView.unreadOnly && !inboxView.domainId }" @click="openInbox('inbox')"><span>{{ copy.inbox }}</span><n-tag size="small" round>{{ counts.inbox }}</n-tag></button>
+              <button :class="{ active: activeSection === 'inbox' && inboxView.unreadOnly }" @click="openInbox('inbox', true)"><span>{{ copy.unread }}</span><n-tag size="small" round type="info">{{ counts.unread }}</n-tag></button>
+              <button :class="{ active: activeSection === 'inbox' && inboxView.folder === 'spam' }" @click="openInbox('spam')"><span>{{ copy.spam }}</span><n-tag size="small" round type="warning">{{ counts.spam }}</n-tag></button>
+            </nav>
+            <h3>{{ copy.sites }}</h3>
+            <nav><button v-for="domain in domains" :key="domain.id" :class="{ active: activeSection === 'inbox' && inboxView.domainId === domain.id }" @click="openInbox('inbox', false, domain.id)"><span>{{ domain.name }}</span></button></nav>
+            <h3>{{ copy.settings }}</h3>
+            <nav>
+              <button :class="{ active: activeSection === 'domains' }" @click="activeSection = 'domains'"><span>{{ copy.domains }}</span></button>
+              <button :class="{ active: activeSection === 'mailboxes' }" @click="activeSection = 'mailboxes'"><span>{{ copy.mailboxes }}</span></button>
+            </nav>
+          </aside>
+          <div class="hub-content">
+            <ContactInbox
+              v-if="activeSection === 'inbox'"
+              :domain-id="inboxView.domainId"
+              :folder="inboxView.folder"
+              :unread-only="inboxView.unreadOnly"
+              @counts="value => counts = value"
+            />
+            <DomainManager v-else-if="activeSection === 'domains'" @changed="refreshDomains" />
+            <MailboxManager v-else />
+          </div>
+        </div>
       </main>
     </template>
   </div>
@@ -172,6 +214,14 @@ onMounted(async () => {
   place-items: center;
 }
 
+.hub-workspace { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 18px; align-items: start; }
+.hub-sidebar { position: sticky; top: 18px; display: grid; gap: 10px; padding: 12px; border: 1px solid rgba(23, 32, 51, .1); border-radius: 12px; background: rgba(255,255,255,.85); }
+.hub-sidebar h3 { margin: 10px 8px 2px; color: #778095; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.hub-sidebar nav { display: grid; gap: 4px; }
+.hub-sidebar button { display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; text-align: left; }
+.hub-sidebar button:hover, .hub-sidebar button.active { background: rgba(48, 103, 246, .1); color: #2457c5; }
+.hub-content { min-width: 0; }
+
 .contact-loading {
   min-height: 100vh;
   display: grid;
@@ -183,5 +233,11 @@ onMounted(async () => {
     align-items: flex-start;
     flex-direction: column;
   }
+  .contact-main { padding: 14px; }
+  .hub-workspace { grid-template-columns: 1fr; }
+  .hub-sidebar { position: static; overflow-x: auto; }
+  .hub-sidebar nav { display: flex; }
+  .hub-sidebar button { min-width: max-content; }
+  .hub-sidebar h3 { display: none; }
 }
 </style>
