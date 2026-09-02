@@ -7,7 +7,7 @@ WORKDIR /app/worker
 
 COPY worker/package.json worker/pnpm-lock.yaml ./
 COPY worker/patches/ patches/
-RUN pnpm install --frozen-lockfile || (echo "WARN: frozen-lockfile failed, falling back to pnpm install" && pnpm install)
+RUN pnpm install --frozen-lockfile
 
 COPY worker/src/ src/
 COPY worker/tsconfig.json ./

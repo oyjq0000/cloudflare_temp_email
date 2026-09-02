@@ -118,3 +118,15 @@
 - [ ] Back up production D1.
 - [ ] Run the Contact migration in staging, then production after review.
 - [ ] Complete production smoke and rollback drills.
+
+
+## RC hardening
+
+- Remote baseline was re-fetched before work: `origin/main=70206c61efa723ef24143eca1d27449ce98a6e0c`, `origin/contact-hub=a4902cdd190ea1752de01370a9593562e0a45d58`, merge-base `70206c61efa723ef24143eca1d27449ce98a6e0c`.
+- Contact password login now exchanges the verified administrator password for a scoped, expiring Contact Admin Session JWT stored only in browser session storage. `/admin/contact/*` no longer accepts `x-admin-auth`; existing `ADMIN_USER_ROLE` access-token login remains supported.
+- Schema target is 7. Migration 6 separates trusted server `received_at` from sender-declared `sender_date`; migration 7 adds durable per-message side-effect status. v5 legacy backfill, migration failure non-recording, and repeat behavior have executable coverage.
+- Inbound post-persist effects use `ExecutionContext.waitUntil` and independent failure boundaries. Failure cannot reverse a stored message or prevent later effects; spam/parse-failed effects are skipped and dedupe does not rerun them.
+- Default Mailbox invariants are enforced server-side and surfaced in Health consistency counts. Sidebar counts come from an independent global endpoint. Health exposes `codeReady`, `adminReady`, `migrationReady`, `storageReady`, `inboundReady`, `outboundReady`, and `productionReady`.
+- Provider management supports edit/disable/re-enable without exposing Secret references/values. Resend/Brevo have explicit bounded HTTP timeouts that map to non-retryable Unknown.
+- A dedicated `Contact Hub RC` GitHub Actions workflow covers Worker test/lint/dry-run build, Frontend unit/build, strict Docker Compose Contact+Temp regression, and Playwright artifacts with no `continue-on-error`.
+- Final RC evidence: Worker 54/54 unit tests + lint + dry-run build passed; Frontend 69/69 unit tests + production build passed; Compose config and Playwright discovery found 206 tests in 53 files; an independent Windows fresh-rebuild Docker run passed 206/206; GitHub Actions run `33642554309` passed all three jobs on code-validation HEAD `b156b58184160eb9a5a788b3fe18eeb887f3f60d`. PR #1 targets `contact-hub` and remains OPEN; no merge or production action was performed.

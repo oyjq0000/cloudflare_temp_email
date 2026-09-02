@@ -1,3 +1,5 @@
+import { getContactAdminHeaders } from '../../fixtures/test-helpers';
+
 import { expect, test } from '@playwright/test';
 
 import {
@@ -8,10 +10,11 @@ import {
   onMailpitMessage,
 } from '../../fixtures/test-helpers';
 
-const ADMIN_HEADERS = { 'x-admin-auth': 'e2e-contact-admin' };
+const ADMIN_HEADERS = await getContactAdminHeaders();
 const run = Date.now();
 let smtpProviderId: number;
 let missingResendId: number;
+let spareProviderId: number;
 let smtpDomain: any;
 let missingDomain: any;
 
@@ -45,6 +48,15 @@ test.describe.serial('Contact Provider Config', () => {
     });
     expect(smtp.status(), await smtp.text()).toBe(201);
     smtpProviderId = (await smtp.json()).result.id;
+    const spare = await request.post(`${WORKER_CONTACT_URL}/admin/contact/providers`, {
+      headers: ADMIN_HEADERS,
+      data: {
+        name: `Spare SMTP ${run}`, provider_type: 'smtp',
+        config: { host: 'mailpit', port: 1025, secure: false, starttls: false }, secret_refs: {},
+      },
+    });
+    expect(spare.status(), await spare.text()).toBe(201);
+    spareProviderId = (await spare.json()).result.id;
 
     smtpDomain = (await (await request.post(`${WORKER_CONTACT_URL}/admin/contact/domains`, {
       headers: ADMIN_HEADERS,
@@ -68,6 +80,8 @@ test.describe.serial('Contact Provider Config', () => {
     expect(serialized).not.toContain('CONTACT_RESEND_E2E_MISSING');
     expect(serialized).not.toContain('e2e-global-must-not-win');
     expect(list.results.find((item: any) => item.id === missingResendId).secrets.apiKey).toBe(false);
+    expect(list.results.find((item: any) => item.id === smtpProviderId)).toMatchObject({ in_use: true, in_use_domain_count: 1 });
+    expect(list.results.find((item: any) => item.id === spareProviderId)).toMatchObject({ in_use: false, in_use_domain_count: 0 });
 
     const invalid = await request.post(`${WORKER_CONTACT_URL}/admin/contact/providers`, {
       headers: ADMIN_HEADERS,
@@ -96,6 +110,34 @@ test.describe.serial('Contact Provider Config', () => {
       provider_type: 'resend',
       result: { certainty: 'rejected', retryable: false, errorClass: 'configuration' },
     });
+  });
+
+
+  test('edits ordinary fields, disables and re-enables an unused Provider without requiring a secret replacement', async ({ request }) => {
+    const updated = await request.patch(`${WORKER_CONTACT_URL}/admin/contact/providers/${spareProviderId}`, {
+      headers: ADMIN_HEADERS,
+      data: {
+        name: `Spare SMTP Edited ${run}`,
+        config: { host: 'mailpit', port: 2025, secure: true, starttls: false },
+      },
+    });
+    expect(updated.ok(), await updated.text()).toBe(true);
+    expect((await updated.json()).result).toMatchObject({
+      name: `Spare SMTP Edited ${run}`,
+      config: { host: 'mailpit', port: 2025, secure: true, starttls: false },
+    });
+
+    const disabled = await request.delete(`${WORKER_CONTACT_URL}/admin/contact/providers/${spareProviderId}`, {
+      headers: ADMIN_HEADERS,
+    });
+    expect(disabled.ok(), await disabled.text()).toBe(true);
+    expect((await disabled.json()).result.enabled).toBe(false);
+
+    const enabled = await request.patch(`${WORKER_CONTACT_URL}/admin/contact/providers/${spareProviderId}`, {
+      headers: ADMIN_HEADERS, data: { enabled: true },
+    });
+    expect(enabled.ok(), await enabled.text()).toBe(true);
+    expect((await enabled.json()).result.enabled).toBe(true);
   });
 
   test('sends explicit SMTP through Mailpit even when a global Resend token exists', async ({ request }) => {

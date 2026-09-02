@@ -13,7 +13,7 @@ const props = defineProps({
   folder: { type: String, default: 'inbox' },
   unreadOnly: { type: Boolean, default: false },
 })
-const emit = defineEmits(['counts'])
+const emit = defineEmits(['changed'])
 const { locale } = useI18n({ useScope: 'global' })
 const isMobile = useIsMobile()
 const notification = useMessage()
@@ -33,13 +33,13 @@ const copy = computed(() => locale.value === 'zh' ? {
   domain: '全部 Domain', mailbox: '全部 Mailbox', dateFrom: '起始时间（ISO）', dateTo: '结束时间（ISO）',
   empty: '没有符合条件的邮件', more: '加载更多', noSubject: '（无主题）', raw: '下载原始邮件',
   read: '标为已读', unread: '标为未读', spam: '移入垃圾邮件', notSpam: '移出垃圾邮件', reply: '回复',
-  attachments: '附件', bodyUnavailable: '这封邮件没有可显示的正文。', close: '关闭',
+  attachments: '附件', senderDate: '发件人声明时间', bodyUnavailable: '这封邮件没有可显示的正文。', close: '关闭',
 } : {
   search: 'Filter', reset: 'Reset', from: 'From', to: 'To', subject: 'Subject',
   domain: 'All domains', mailbox: 'All mailboxes', dateFrom: 'From date (ISO)', dateTo: 'To date (ISO)',
   empty: 'No messages match these filters', more: 'Load more', noSubject: '(no subject)', raw: 'Download raw message',
   read: 'Mark read', unread: 'Mark unread', spam: 'Move to spam', notSpam: 'Not spam', reply: 'Reply',
-  attachments: 'Attachments', bodyUnavailable: 'This message has no displayable body.', close: 'Close',
+  attachments: 'Attachments', senderDate: 'Sender-declared date', bodyUnavailable: 'This message has no displayable body.', close: 'Close',
 })
 
 const domainOptions = computed(() => [
@@ -71,7 +71,6 @@ const load = async (reset = true) => {
     if (loadId !== latestLoadId) return
     items.value = reset ? (response.results || []) : [...items.value, ...(response.results || [])]
     nextCursor.value = response.nextCursor
-    emit('counts', response.counts || { inbox: 0, unread: 0, spam: 0 })
   } catch (error) {
     if (loadId === latestLoadId) notification.error(error.message)
   } finally {
@@ -92,6 +91,7 @@ const selectMessage = async (item) => {
       selected.value = (await contactApi.markRead(item.id)).result
       item.is_read = true
       await load(true)
+      emit('changed')
     }
   } catch (error) {
     notification.error(error.message)
@@ -105,6 +105,7 @@ const updateSelected = async (action) => {
   try {
     selected.value = (await action(selected.value.id)).result
     await load(true)
+    emit('changed')
   } catch (error) { notification.error(error.message) }
 }
 
@@ -180,7 +181,7 @@ onMounted(async () => {
           <n-empty v-if="!selected" :description="copy.empty" />
           <article v-else>
             <header class="detail-header">
-              <div><h2>{{ selected.subject || copy.noSubject }}</h2><p>{{ selected.from_name }} &lt;{{ selected.from_address }}&gt; → {{ selected.to_address }}</p></div>
+              <div><h2>{{ selected.subject || copy.noSubject }}</h2><p>{{ selected.from_name }} &lt;{{ selected.from_address }}&gt; → {{ selected.to_address }}</p><p v-if="selected.sender_date">{{ copy.senderDate }}: {{ new Date(selected.sender_date).toLocaleString() }}</p></div>
               <n-space wrap>
                 <n-button size="small" type="primary" @click="showReply = true">{{ copy.reply }}</n-button>
                 <n-button size="small" @click="updateSelected(selected.is_read ? contactApi.markUnread : contactApi.markRead)">{{ selected.is_read ? copy.unread : copy.read }}</n-button>
@@ -200,7 +201,7 @@ onMounted(async () => {
     <n-drawer v-if="isMobile" :show="Boolean(selected)" width="100%" placement="right" @update:show="value => { if (!value) selected = null }">
       <n-drawer-content :title="selected?.subject || copy.noSubject" closable>
         <template v-if="selected">
-          <p>{{ selected.from_name }} &lt;{{ selected.from_address }}&gt; → {{ selected.to_address }}</p>
+          <p>{{ selected.from_name }} &lt;{{ selected.from_address }}&gt; → {{ selected.to_address }}</p><p v-if="selected.sender_date">{{ copy.senderDate }}: {{ new Date(selected.sender_date).toLocaleString() }}</p>
           <n-space wrap class="mobile-actions">
             <n-button size="small" type="primary" @click="showReply = true">{{ copy.reply }}</n-button>
             <n-button size="small" @click="updateSelected(selected.is_read ? contactApi.markUnread : contactApi.markRead)">{{ selected.is_read ? copy.unread : copy.read }}</n-button>

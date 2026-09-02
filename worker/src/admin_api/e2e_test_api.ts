@@ -42,6 +42,8 @@ const receiveMail = async (c: Context<HonoCustomType>) => {
         force_d1_failure,
         force_junk_check,
         force_forward,
+        fail_side_effects,
+        force_parse_failure,
     } = await c.req.json();
     if (!from || !to || !raw) {
         return c.text("from, to and raw are required", 400);
@@ -107,12 +109,16 @@ const receiveMail = async (c: Context<HonoCustomType>) => {
         }
     }
     if (force_forward) env = { ...env, FORWARD_ADDRESS_LIST: ['side-effect@example.test'] }
+    if (Array.isArray(fail_side_effects)) env = { ...env, CONTACT_E2E_FAIL_SIDE_EFFECTS: fail_side_effects }
+    if (force_parse_failure) env = { ...env, CONTACT_E2E_FORCE_PARSE_FAILURE: true }
+    const waitUntilPromises: Promise<unknown>[] = []
     const executionContext: ExecutionContext = {
-        waitUntil: () => {},
+        waitUntil: (promise) => { waitUntilPromises.push(Promise.resolve(promise)) },
         passThroughOnException: () => {},
         props: {}
     };
     await emailHandler(mockMessage, env, executionContext);
+    await Promise.allSettled(waitUntilPromises)
 
     return c.json({
         success: !state.rejected,
@@ -141,7 +147,11 @@ const contactMessage = async (c: Context<HonoCustomType>) => {
     const count = await c.env.DB.prepare(`
         SELECT COUNT(*) AS count FROM contact_messages m WHERE ${conditions.join(' AND ')}
     `).bind(...values).first<number>('count') || 0
-    if (!message) return c.json({ message: null, count, attachments: [] })
+    if (!message) return c.json({ message: null, count, attachments: [], sideEffects: [] })
+    const sideEffects = await c.env.DB.prepare(`
+        SELECT effect, status, attempt_count, last_error_code, last_error_class
+        FROM contact_message_side_effects WHERE message_id = ? ORDER BY id
+    `).bind(message.id).all<Record<string, unknown>>()
     const { results } = await c.env.DB.prepare(`
         SELECT id, filename, mime_type, disposition, content_id, size, sha256,
             storage_key, storage_status
@@ -157,7 +167,7 @@ const contactMessage = async (c: Context<HonoCustomType>) => {
             ))
         }
     }
-    return c.json({ message, count, attachments: results || [], rawObjectStored, attachmentObjectsStored })
+    return c.json({ message, count, attachments: results || [], sideEffects: sideEffects.results || [], rawObjectStored, attachmentObjectsStored })
 }
 
 const contactProviderSend = async (c: Context<HonoCustomType>) => {
@@ -187,6 +197,34 @@ const contactProviderSend = async (c: Context<HonoCustomType>) => {
         const response = contactErrorResponse(error)
         return c.json(response.body, response.status)
     }
+}
+
+const contactDefaultCorruption = async (c: Context<HonoCustomType>) => {
+    if (!getBooleanValue(c.env.E2E_TEST_MODE)) return c.text('Not available', 404)
+    const input = await c.req.json<Record<string, unknown>>()
+    const action = String(input.action || '')
+    const domainId = Number(input.domain_id)
+    const mailboxId = Number(input.mailbox_id)
+    const otherMailboxId = Number(input.other_mailbox_id)
+    if (!Number.isInteger(domainId) || !Number.isInteger(mailboxId)) return c.text('ids are required', 400)
+    if (action === 'invalid') {
+        await c.env.DB.prepare(`UPDATE contact_mailboxes SET enabled = 0 WHERE id = ?`).bind(mailboxId).run()
+    } else if (action === 'cross-domain-pointer') {
+        if (!Number.isInteger(otherMailboxId)) return c.text('other_mailbox_id is required', 400)
+        await c.env.DB.prepare(`UPDATE contact_domains SET default_mailbox_id = ? WHERE id = ?`).bind(otherMailboxId, domainId).run()
+    } else if (action === 'multiple') {
+        if (!Number.isInteger(otherMailboxId)) return c.text('other_mailbox_id is required', 400)
+        await c.env.DB.prepare(`DROP INDEX IF EXISTS idx_contact_mailboxes_one_default`).run()
+        await c.env.DB.prepare(`UPDATE contact_mailboxes SET is_default = 1 WHERE id IN (?, ?)`).bind(mailboxId, otherMailboxId).run()
+    } else if (action === 'repair') {
+        await c.env.DB.batch([
+            c.env.DB.prepare(`UPDATE contact_mailboxes SET enabled = 1, outbound_enabled = 1 WHERE domain_id = ?`).bind(domainId),
+            c.env.DB.prepare(`UPDATE contact_mailboxes SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE domain_id = ?`).bind(mailboxId, domainId),
+            c.env.DB.prepare(`UPDATE contact_domains SET default_mailbox_id = ? WHERE id = ?`).bind(mailboxId, domainId),
+        ])
+        await c.env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_contact_mailboxes_one_default ON contact_mailboxes(domain_id) WHERE is_default = 1`).run()
+    } else return c.text('unknown action', 400)
+    return c.json({ ok: true })
 }
 
 const contactPerformanceSeed = async (c: Context<HonoCustomType>) => {
@@ -246,4 +284,4 @@ const contactPerformanceSeed = async (c: Context<HonoCustomType>) => {
     return c.json({ ok: true, domains: mailboxIds.length, messages: total, elapsedMs: Date.now() - started })
 }
 
-export default { seedMail, receiveMail, contactMessage, contactProviderSend, contactPerformanceSeed };
+export default { seedMail, receiveMail, contactMessage, contactProviderSend, contactDefaultCorruption, contactPerformanceSeed };

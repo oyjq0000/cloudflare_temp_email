@@ -108,6 +108,22 @@ services:
       start_period: 10s
       retries: 20
 
+  worker-contact-no-bypass:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile.worker
+      args:
+        WRANGLER_TOML: e2e/fixtures/wrangler.toml.e2e.contact-no-bypass
+    ports:
+      - "8793:8793"
+    command: ["pnpm", "exec", "wrangler", "dev", "--port", "8793", "--ip", "0.0.0.0"]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8793/open_api/settings"]
+      interval: 3s
+      timeout: 5s
+      start_period: 10s
+      retries: 20
+
   frontend:
     build:
       context: ..
@@ -179,6 +195,7 @@ services:
       WORKER_GZIP_URL: http://worker-gzip:8788
       WORKER_URL_SEND_MAIL_DOMAIN: http://worker-send-mail-domain:8791
       WORKER_CONTACT_URL: http://worker-contact:8792
+      WORKER_CONTACT_NO_BYPASS_URL: http://worker-contact-no-bypass:8793
       CONTACT_ADMIN_PASSWORD: e2e-contact-admin
       FRONTEND_URL: https://frontend:5173
       FRONTEND_CONTACT_URL: https://frontend-contact:5174
@@ -202,6 +219,8 @@ services:
       worker-send-mail-domain:
         condition: service_healthy
       worker-contact:
+        condition: service_healthy
+      worker-contact-no-bypass:
         condition: service_healthy
       frontend:
         condition: service_started

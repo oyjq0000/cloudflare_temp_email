@@ -1,4 +1,4 @@
-import { acceptedHttpResult, address, parseJsonResponse, rejectedHttpResult } from './http.ts'
+import { acceptedHttpResult, address, parseJsonResponse, providerHttpFetch, rejectedHttpResult } from './http.ts'
 import {
     configurationFailure,
     providerExceptionResult,
@@ -21,7 +21,7 @@ export class ResendProvider implements OutboundProvider {
     async send(message: OutboundMessage, runtime: ProviderRuntimeConfig): Promise<ProviderSendResult> {
         if (!runtime.secrets.apiKey) return configurationFailure('RESEND_API_KEY_MISSING')
         try {
-            const response = await this.fetcher(this.endpoint, {
+            const response = await providerHttpFetch(this.fetcher, this.endpoint, {
                 method: 'POST',
                 headers: {
                     Authorization: `Bearer ${runtime.secrets.apiKey}`,
@@ -44,7 +44,7 @@ export class ResendProvider implements OutboundProvider {
                             : {}
                     ),
                 }),
-            })
+            }, runtime.httpTimeoutMs || 15_000)
             if (!response.ok) return rejectedHttpResult(response.status)
             const json = await parseJsonResponse(response)
             return acceptedHttpResult(json.id || (json.data as Record<string, unknown> | undefined)?.id)

@@ -1,8 +1,8 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
-import { WORKER_CONTACT_URL } from '../../fixtures/test-helpers';
+import { getContactAdminHeaders, WORKER_CONTACT_URL } from '../../fixtures/test-helpers';
 
-const ADMIN_HEADERS = { 'x-admin-auth': 'e2e-contact-admin' };
+const ADMIN_HEADERS = await getContactAdminHeaders();
 const run = Date.now();
 let sequence = 0;
 
@@ -161,6 +161,74 @@ test.describe.serial('Contact inbound persistence', () => {
     expect((await inspect(request, fallbackAddress)).count).toBe(1);
   });
 
+
+  test('uses trusted server receive time and preserves only the sender-declared Date separately', async ({ request }) => {
+    for (const [label, declared, expectedSenderDate] of [
+      ['future-date', 'Fri, 01 Jan 2099 00:00:00 +0000', '2099-01-01T00:00:00.000Z'],
+      ['past-date', 'Thu, 01 Jan 1970 00:00:00 +0000', '1970-01-01T00:00:00.000Z'],
+      ['invalid-date', 'not-a-real-date', null],
+    ] as const) {
+      const address = await createMailbox(request, label);
+      const messageId = `<${label}-${run}@example.net>`;
+      const raw = plainMail(address, messageId).replace(
+        'Date: Tue, 01 Sep 2026 08:00:00 +0000',
+        `Date: ${declared}`,
+      );
+      const before = Date.now() - 2_000;
+      expect((await receive(request, address, raw)).ok()).toBe(true);
+      const after = Date.now() + 2_000;
+      const stored = await inspect(request, address, messageId);
+      expect(stored.message.sender_date).toBe(expectedSenderDate);
+      const received = new Date(stored.message.received_at).getTime();
+      expect(received).toBeGreaterThanOrEqual(before);
+      expect(received).toBeLessThanOrEqual(after);
+    }
+
+    const address = await createMailbox(request, 'missing-date');
+    const messageId = `<missing-date-${run}@example.net>`;
+    const withoutDate = plainMail(address, messageId).replace('Date: Tue, 01 Sep 2026 08:00:00 +0000\r\n', '');
+    expect((await receive(request, address, withoutDate)).ok()).toBe(true);
+    expect((await inspect(request, address, messageId)).message.sender_date).toBeNull();
+  });
+
+  test('isolates every post-persist side effect and records durable status without re-running dedupe', async ({ request }) => {
+    const effects = ['forward', 'ai_extract', 'telegram', 'webhook', 'another_worker', 'auto_reply'];
+    for (const effect of effects) {
+      const fixtureLabel = effect.replaceAll('_', '-');
+      const address = await createMailbox(request, `effect-${fixtureLabel}`);
+      const messageId = `<effect-${fixtureLabel}-${run}@example.net>`;
+      const raw = plainMail(address, messageId, `failure injection ${effect}`);
+      const first = await receive(request, address, raw, { fail_side_effects: [effect], force_forward: true });
+      expect((await first.json()).success).toBe(true);
+      const stored = await inspect(request, address, messageId);
+      expect(stored.count).toBe(1);
+      const byEffect = Object.fromEntries(stored.sideEffects.map((item: any) => [item.effect, item]));
+      expect(byEffect[effect].status).toBe('failed');
+      expect(byEffect[effect].attempt_count).toBe(1);
+      for (const later of effects.slice(effects.indexOf(effect) + 1)) {
+        expect(byEffect[later].status).toBe('succeeded');
+      }
+
+      const duplicate = await receive(request, address, raw, { force_forward: true });
+      expect((await duplicate.json()).success).toBe(true);
+      const afterDuplicate = await inspect(request, address, messageId);
+      const afterByEffect = Object.fromEntries(afterDuplicate.sideEffects.map((item: any) => [item.effect, item]));
+      expect(afterByEffect[effect].attempt_count).toBe(1);
+    }
+  });
+
+
+  test('marks all post-persist side effects skipped when MIME parsing fails', async ({ request }) => {
+    const address = await createMailbox(request, 'parse-failed');
+    const messageId = `<parse-failed-${run}@example.net>`;
+    const response = await receive(request, address, plainMail(address, messageId), { force_parse_failure: true });
+    expect((await response.json()).success).toBe(true);
+    const stored = await inspect(request, address, messageId);
+    expect(stored.message.parse_status).toBe('failed');
+    expect(stored.sideEffects).toHaveLength(6);
+    expect(stored.sideEffects.every((item: any) => item.status === 'skipped')).toBe(true);
+  });
+
   test('keeps D1 fallback visible on R2 failure and repairs it later', async ({ request }) => {
     const address = await createMailbox(request, 'repair');
     const messageId = `<repair-${run}@example.net>`;
@@ -208,10 +276,10 @@ test.describe.serial('Contact inbound persistence', () => {
       force_forward: true,
     });
     expect((await spam.json()).forwardedTo).toEqual([]);
-    expect((await inspect(request, spamAddress, spamId)).message).toMatchObject({
-      folder: 'spam',
-      spam_reason: 'authentication-policy',
-    });
+    const spamStored = await inspect(request, spamAddress, spamId);
+    expect(spamStored.message).toMatchObject({ folder: 'spam', spam_reason: 'authentication-policy' });
+    expect(spamStored.sideEffects).toHaveLength(6);
+    expect(spamStored.sideEffects.every((item: any) => item.status === 'skipped')).toBe(true);
   });
 
   test('rejects unknown recipients and reports storage health', async ({ request }) => {

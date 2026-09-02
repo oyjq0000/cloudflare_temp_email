@@ -1,8 +1,8 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
-import { WORKER_CONTACT_URL } from '../../fixtures/test-helpers';
+import { getContactAdminHeaders, WORKER_CONTACT_URL } from '../../fixtures/test-helpers';
 
-const ADMIN_HEADERS = { 'x-admin-auth': 'e2e-contact-admin' };
+const ADMIN_HEADERS = await getContactAdminHeaders();
 const run = Date.now();
 let primary: { id: number, mailboxId: number, address: string };
 let secondary: { id: number, mailboxId: number, address: string };
@@ -111,6 +111,9 @@ test.describe.serial('Contact message API', () => {
     )).json();
     expect(secondPage.results).toHaveLength(10);
     expect(new Set([...first.results, ...secondPage.results].map((row: any) => row.id)).size).toBe(20);
+    const countsBeforeCursor = await (await request.get(`${WORKER_CONTACT_URL}/admin/contact/message-counts`, { headers: ADMIN_HEADERS })).json();
+    const countsAfterCursor = await (await request.get(`${WORKER_CONTACT_URL}/admin/contact/message-counts`, { headers: ADMIN_HEADERS })).json();
+    expect(countsAfterCursor).toMatchObject({ inbox: countsBeforeCursor.inbox, unread: countsBeforeCursor.unread, spam: countsBeforeCursor.spam });
 
     const subject = await (await request.get(
       `${WORKER_CONTACT_URL}/admin/contact/messages?limit=5&domain_id=${primary.id}&subject=${encodeURIComponent('Cursor message 02')}`,
@@ -118,8 +121,10 @@ test.describe.serial('Contact message API', () => {
     )).json();
     expect(subject.results.map((row: any) => row.subject)).toEqual(['Cursor message 02']);
 
+    const serverWindowFrom = new Date(Date.now() - 5 * 60_000).toISOString();
+    const serverWindowTo = new Date(Date.now() + 5 * 60_000).toISOString();
     const combined = await (await request.get(
-      `${WORKER_CONTACT_URL}/admin/contact/messages?domain_id=${secondary.id}&mailbox_id=${secondary.mailboxId}&from=phase4.sender&to=${encodeURIComponent(secondary.address)}&date_from=2026-09-01T08:39:00Z&date_to=2026-09-01T08:41:00Z`,
+      `${WORKER_CONTACT_URL}/admin/contact/messages?domain_id=${secondary.id}&mailbox_id=${secondary.mailboxId}&from=phase4.sender&to=${encodeURIComponent(secondary.address)}&date_from=${encodeURIComponent(serverWindowFrom)}&date_to=${encodeURIComponent(serverWindowTo)}`,
       { headers: ADMIN_HEADERS },
     )).json();
     expect(combined.results).toHaveLength(1);
@@ -149,14 +154,24 @@ test.describe.serial('Contact message API', () => {
       { headers: ADMIN_HEADERS },
     )).json();
     const id = before.results[0].id;
-    expect(before.counts).toMatchObject({ inbox: 1, unread: 1, spam: 0 });
+    expect(before.filteredCounts).toMatchObject({ inbox: 1, unread: 1, spam: 0 });
+    const globalBefore = await (await request.get(`${WORKER_CONTACT_URL}/admin/contact/message-counts`, { headers: ADMIN_HEADERS })).json();
+    const filteredSearch = await (await request.get(
+      `${WORKER_CONTACT_URL}/admin/contact/messages?domain_id=${secondary.id}&subject=does-not-exist&limit=1`,
+      { headers: ADMIN_HEADERS },
+    )).json();
+    expect(filteredSearch.results).toHaveLength(0);
+    const globalAfterFilter = await (await request.get(`${WORKER_CONTACT_URL}/admin/contact/message-counts`, { headers: ADMIN_HEADERS })).json();
+    expect(globalAfterFilter).toMatchObject({ inbox: globalBefore.inbox, unread: globalBefore.unread, spam: globalBefore.spam });
 
     await request.post(`${WORKER_CONTACT_URL}/admin/contact/messages/${id}/read`, { headers: ADMIN_HEADERS });
-    expect((await (await request.get(`${WORKER_CONTACT_URL}/admin/contact/messages?domain_id=${secondary.id}`, { headers: ADMIN_HEADERS })).json()).counts.unread).toBe(0);
+    expect((await (await request.get(`${WORKER_CONTACT_URL}/admin/contact/messages?domain_id=${secondary.id}`, { headers: ADMIN_HEADERS })).json()).filteredCounts.unread).toBe(0);
+    const globalAfterRead = await (await request.get(`${WORKER_CONTACT_URL}/admin/contact/message-counts`, { headers: ADMIN_HEADERS })).json();
+    expect(globalAfterRead.unread).toBe(globalBefore.unread - 1);
     await request.post(`${WORKER_CONTACT_URL}/admin/contact/messages/${id}/unread`, { headers: ADMIN_HEADERS });
     await request.post(`${WORKER_CONTACT_URL}/admin/contact/messages/${id}/spam`, { headers: ADMIN_HEADERS });
     const spam = await (await request.get(`${WORKER_CONTACT_URL}/admin/contact/messages?domain_id=${secondary.id}&folder=inbox`, { headers: ADMIN_HEADERS })).json();
-    expect(spam.counts).toMatchObject({ inbox: 0, unread: 0, spam: 1 });
+    expect(spam.filteredCounts).toMatchObject({ inbox: 0, unread: 0, spam: 1 });
     expect(spam.results).toHaveLength(0);
     await request.post(`${WORKER_CONTACT_URL}/admin/contact/messages/${id}/not-spam`, { headers: ADMIN_HEADERS });
   });

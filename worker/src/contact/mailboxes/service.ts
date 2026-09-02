@@ -104,6 +104,13 @@ export const createMailbox = async (db: D1Database, input: ContactMailboxInput) 
     const currentCount = await db.prepare(`SELECT COUNT(*) AS count FROM contact_mailboxes WHERE domain_id = ?`)
         .bind(domainId).first<number>('count') || 0
     const makeDefault = currentCount === 0 || toBooleanInt(input.is_default, false) === 1
+    if (makeDefault && (enabled !== 1 || outboundEnabled !== 1)) {
+        throw new ContactError(
+            'CONTACT_DEFAULT_MAILBOX_MUST_BE_USABLE',
+            'A default Mailbox must be enabled with outbound enabled',
+            409,
+        )
+    }
 
     const statements: D1PreparedStatement[] = [
         db.prepare(`
@@ -170,6 +177,25 @@ export const updateMailbox = async (db: D1Database, id: number, input: ContactMa
         ? undefined : toBooleanInt(input.outbound_enabled, true)
     const requestedDefault = input.is_default === undefined
         ? undefined : toBooleanInt(input.is_default, false)
+
+    const finalEnabled = enabled ?? current.enabled
+    const finalOutboundEnabled = outboundEnabled ?? current.outbound_enabled
+    if (requestedDefault === 1 && current.is_default !== 1) {
+        if (current.enabled !== 1 || current.outbound_enabled !== 1) {
+            throw new ContactError(
+                'CONTACT_DEFAULT_MAILBOX_MUST_BE_USABLE',
+                'Enable the Mailbox and outbound delivery before making it default',
+                409,
+            )
+        }
+        if (finalEnabled !== 1 || finalOutboundEnabled !== 1) {
+            throw new ContactError(
+                'CONTACT_DEFAULT_MAILBOX_MUST_BE_USABLE',
+                'A default Mailbox must be enabled with outbound enabled',
+                409,
+            )
+        }
+    }
 
     if (
         current.is_default === 1

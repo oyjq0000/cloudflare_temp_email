@@ -54,6 +54,7 @@ export const contactApi = {
     method: 'POST', body: jsonBody({ older_than_minutes: olderThanMinutes }),
   }),
 
+  getMessageCounts: () => api.fetch('/admin/contact/message-counts'),
   listMessages: (params) => api.fetch(`/admin/contact/messages${queryString(params)}`),
   getMessage: (id) => api.fetch(`/admin/contact/messages/${id}`),
   markRead: (id) => api.fetch(`/admin/contact/messages/${id}/read`, { method: 'POST' }),

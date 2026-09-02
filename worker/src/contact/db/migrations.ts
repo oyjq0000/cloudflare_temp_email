@@ -229,6 +229,45 @@ export const CONTACT_MIGRATIONS: ContactMigration[] = [
                 ON contact_dns_checks(domain_id, record_purpose, record_name, checked_at DESC)`,
         ],
     },
+    {
+        version: 6,
+        name: 'contact_trusted_receive_time',
+        statements: [
+            `ALTER TABLE contact_messages ADD COLUMN sender_date DATETIME`,
+            `UPDATE contact_messages
+                SET sender_date = received_at,
+                    received_at = COALESCE(created_at, received_at)
+                WHERE sender_date IS NULL`,
+        ],
+    },
+    {
+        version: 7,
+        name: 'contact_message_side_effect_tracking',
+        statements: [
+            `CREATE TABLE IF NOT EXISTS contact_message_side_effects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                message_id INTEGER NOT NULL,
+                effect TEXT NOT NULL CHECK(effect IN (
+                    'forward', 'ai_extract', 'telegram', 'webhook', 'another_worker', 'auto_reply'
+                )),
+                status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK(status IN ('pending', 'running', 'succeeded', 'failed', 'skipped')),
+                attempt_count INTEGER NOT NULL DEFAULT 0 CHECK(attempt_count >= 0),
+                last_error_code TEXT,
+                last_error_class TEXT,
+                last_attempt_at DATETIME,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(message_id) REFERENCES contact_messages(id),
+                UNIQUE(message_id, effect)
+            )`,
+            `CREATE INDEX IF NOT EXISTS idx_contact_message_side_effects_status
+                ON contact_message_side_effects(status, updated_at DESC, id DESC)`,
+            `CREATE INDEX IF NOT EXISTS idx_contact_message_side_effects_message
+                ON contact_message_side_effects(message_id, effect)`,
+        ],
+    },
+
 ]
 
 export const CONTACT_SCHEMA_VERSION = CONTACT_MIGRATIONS.at(-1)?.version || 0

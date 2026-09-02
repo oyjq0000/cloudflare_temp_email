@@ -4,6 +4,7 @@ import { contactErrorResponse, requireContactId } from '../errors'
 import { getContactAttachmentDownload, getContactRawDownload } from './content'
 import {
     getContactMessage,
+    getGlobalContactMessageCounts,
     listContactMessages,
     parseMessageListFilters,
     setContactMessageRead,
@@ -19,6 +20,12 @@ export const list = async (c: Context<HonoCustomType>) => {
     try {
         return c.json({ ok: true, ...(await listContactMessages(c.env.DB, parseMessageListFilters(c.req.query()))) })
     } catch (error) { return respond(c, error) }
+}
+
+
+export const counts = async (c: Context<HonoCustomType>) => {
+    try { return c.json({ ok: true, ...(await getGlobalContactMessageCounts(c.env.DB)) }) }
+    catch (error) { return respond(c, error) }
 }
 
 export const get = async (c: Context<HonoCustomType>) => {

@@ -24,7 +24,8 @@ function matchSender(from: string, sourcePrefix: string | undefined): boolean {
 export const auto_reply = async (
     message: ForwardableEmailMessage,
     env: Bindings,
-    toAddress: string = normalizeAddressDomain(message.to)
+    toAddress: string = normalizeAddressDomain(message.to),
+    rethrowOnError = false,
 ): Promise<void> => {
     const message_id = message.headers.get("Message-ID");
     // auto reply email
@@ -63,7 +64,8 @@ export const auto_reply = async (
                 }
             }
         } catch (error) {
-            console.log("reply email error", error);
+            console.error("reply email error", { error: (error as Error).name || 'Error' });
+            if (rethrowOnError) throw error
         }
     }
 }

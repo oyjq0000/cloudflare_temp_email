@@ -2,6 +2,7 @@ import { ContactError } from '../errors'
 import { contactDedupeKey, contactRawMailId, contactStorageId, sha256Hex } from './identity'
 import type { ContactParsedMime } from './mime'
 import { contactObjectKeys, storeContactObjects } from '../storage/object_store'
+import { sideEffectInsertStatements } from './side_effects'
 
 const MAX_D1_RAW_BYTES = 1_500_000
 
@@ -23,6 +24,7 @@ export type PersistContactMessageInput = {
     spamReason: string | null
     parseStatus?: 'parsed' | 'failed'
     parseError?: string | null
+    receivedAt: string
 }
 
 export type PersistedContactMessage = {
@@ -82,8 +84,8 @@ export const persistContactMessage = async (
                 message_id_header, in_reply_to_header, references_json,
                 dedupe_key, folder, spam_reason, has_attachments,
                 raw_storage_key, storage_status, parse_status, parse_error,
-                content_truncated, received_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
+                content_truncated, sender_date, received_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)
         `).bind(
             rawMailId, mailbox.domain_id, mailbox.id, input.envelopeFrom,
             input.parsed.fromName, input.parsed.fromAddress, input.parsed.replyToAddress,
@@ -92,9 +94,14 @@ export const persistContactMessage = async (
             input.parsed.messageId, input.parsed.inReplyTo, JSON.stringify(input.parsed.references),
             dedupeKey, input.folder, input.spamReason, input.parsed.attachments.length > 0 ? 1 : 0,
             keys.raw, input.parseStatus || 'parsed', input.parseError || null,
-            input.parsed.contentTruncated ? 1 : 0, input.parsed.receivedAt,
+            input.parsed.contentTruncated ? 1 : 0, input.parsed.senderDate, input.receivedAt,
         ),
     ]
+    statements.push(...sideEffectInsertStatements(
+        db,
+        dedupeKey,
+        input.folder === 'spam' || input.parseStatus === 'failed',
+    ))
 
     for (let index = 0; index < input.parsed.attachments.length; index += 1) {
         const attachment = input.parsed.attachments[index]

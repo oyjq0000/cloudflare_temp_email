@@ -51,6 +51,10 @@ PREFIX = "tmp"
 # CONTACT_ALLOWED_ORIGINS = ["https://mail.example.com"]
 # Cached DNS checks are considered stale after this many seconds (60-86400).
 # CONTACT_DNS_CACHE_TTL_SECONDS = 3600
+# Contact password login session TTL in seconds. Default 14400; allowed range 900-28800.
+# CONTACT_ADMIN_SESSION_TTL_SECONDS = 14400
+# Resend/Brevo HTTP request timeout in milliseconds. Default 15000; allowed range 1000-60000.
+# CONTACT_PROVIDER_HTTP_TIMEOUT_MS = 15000
 # For admin panel
 # ADMIN_PASSWORDS = ["123", "456"]
 # warning: no password or user check for admin portal

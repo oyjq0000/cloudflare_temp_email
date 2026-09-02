@@ -60,6 +60,8 @@ The attempt and parent row record:
 
 Required error classes: `validation`, `configuration`, `authentication`, `rate_limit`, `provider_rejected`, `provider_server_error`, `network`, `network_timeout`, `unknown_response`, `storage`.
 
+Resend/Brevo HTTP calls have an explicit `AbortController` timeout controlled by `CONTACT_PROVIDER_HTTP_TIMEOUT_MS` (default 15000 ms, valid range 1000–60000). Timeout maps to `unknown`, `retryable=false`, `network_timeout`, and `PROVIDER_TIMEOUT`. No second Provider call is made, no fallback is selected, and ordinary Retry remains forbidden by the Unknown-state rule.
+
 ## Retry rules
 
 Failed Retry reuses the same outbound intent and appends another attempt. The administrator may explicitly choose another provider config; the selected attempt provider is recorded. It still requires an atomic `failed -> sending` claim.

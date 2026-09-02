@@ -54,7 +54,8 @@ function matchSourcePatterns(
  */
 async function forwardToGlobalAddresses(
     message: ForwardableEmailMessage,
-    env: Bindings
+    env: Bindings,
+    rethrowOnError = false,
 ): Promise<void> {
     try {
         const forwardAddressList = getEnvStringList(env.FORWARD_ADDRESS_LIST);
@@ -62,7 +63,8 @@ async function forwardToGlobalAddresses(
             await message.forward(forwardAddress);
         }
     } catch (error) {
-        console.error("forward email error", error);
+        console.error("forward email error", { error: (error as Error).name || 'Error' });
+        if (rethrowOnError) throw error
     }
 }
 
@@ -71,7 +73,8 @@ async function forwardToGlobalAddresses(
  */
 async function forwardByRules(
     message: ForwardableEmailMessage,
-    env: Bindings
+    env: Bindings,
+    rethrowOnError = false,
 ): Promise<void> {
     try {
         // 获取环境变量配置
@@ -122,7 +125,8 @@ async function forwardByRules(
             }
         }
     } catch (error) {
-        console.error("forward by rules error", error);
+        console.error("forward by rules error", { error: (error as Error).name || 'Error' });
+        if (rethrowOnError) throw error
     }
 }
 
@@ -131,13 +135,14 @@ async function forwardByRules(
  */
 async function forwardEmail(
     message: ForwardableEmailMessage,
-    env: Bindings
+    env: Bindings,
+    rethrowOnError = false,
 ): Promise<void> {
     // 全局转发
-    await forwardToGlobalAddresses(message, env);
+    await forwardToGlobalAddresses(message, env, rethrowOnError);
 
     // 规则转发
-    await forwardByRules(message, env);
+    await forwardByRules(message, env, rethrowOnError);
 }
 
 export {

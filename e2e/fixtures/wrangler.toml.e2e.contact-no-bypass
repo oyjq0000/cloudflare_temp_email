@@ -1,0 +1,34 @@
+name = "cloudflare_temp_email_contact_no_bypass"
+main = "src/worker.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = [ "nodejs_compat" ]
+keep_vars = true
+
+[vars]
+CONTACT_MAIL_MODE = true
+PREFIX = "MUST_NOT_LEAK"
+DEFAULT_DOMAINS = ["PRIVATE-DEFAULT.EXAMPLE.COM"]
+DOMAINS = ["PRIVATE-CONTACT.EXAMPLE.COM"]
+JWT_SECRET = "e2e-contact-test-secret-key"
+BLACK_LIST = ""
+ENABLE_USER_CREATE_EMAIL = true
+ENABLE_USER_DELETE_EMAIL = true
+DEFAULT_SEND_BALANCE = 10
+ADMIN_PASSWORDS = ["e2e-contact-admin"]
+DISABLE_ADMIN_PASSWORD_CHECK = true
+CONTACT_ALLOWED_ORIGINS = ["https://frontend-contact:5174"]
+E2E_TEST_MODE = false
+RESEND_TOKEN = "e2e-global-must-not-win"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "e2e-contact-no-bypass-kv-00000000-0000-0000-0000-000000000000"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "e2e-contact-no-bypass-email"
+database_id = "e2e-contact-no-bypass-db-00000000-0000-0000-0000-000000000000"
+
+[[r2_buckets]]
+binding = "CONTACT_R2"
+bucket_name = "e2e-contact-no-bypass-r2"

@@ -18,6 +18,7 @@ export type OutboundMessage = {
 export type ProviderRuntimeConfig = {
     config: Record<string, unknown>
     secrets: Record<string, string>
+    httpTimeoutMs?: number
 }
 
 export type ProviderSendResult = {

@@ -2,9 +2,9 @@
 
 ## Trust boundary
 
-Contact Hub is an administrator-only application. `CONTACT_MAIL_MODE=true` does not merely hide the Temp UI: Worker middleware rejects public mailbox, address creation, registration, OAuth mailbox entry, user-portal mailbox access, and public-send routes before their handlers run. `/admin/contact/*` then requires the existing administrator credential or a verified account with `ADMIN_USER_ROLE`.
+Contact Hub is an administrator-only application. `CONTACT_MAIL_MODE=true` does not merely hide the Temp UI: Worker middleware rejects public mailbox, address creation, registration, OAuth mailbox entry, user-portal mailbox access, and public-send routes before their handlers run. Password login is exchanged through `POST /open_api/contact_admin_login` for a scoped Contact Admin Session JWT (`scope=contact:admin`, `iat`, `exp`). The default TTL is 4 hours and `CONTACT_ADMIN_SESSION_TTL_SECONDS` is constrained to 900–28800 seconds.
 
-Production is unhealthy when neither administrator mechanism is configured. `DISABLE_ADMIN_PASSWORD_CHECK=true` is rejected in Contact Mode unless the process is explicitly running with `E2E_TEST_MODE=true`; that exception is only for disposable local tests.
+`/admin/contact/*` accepts the scoped Bearer token or an existing verified `ADMIN_USER_ROLE` access token. It does not accept `x-admin-auth`, an Address JWT, a wrong-scope token, or an expired token. A Contact token does not authorize ordinary `/admin/*`. The frontend stores only the Contact token in `sessionStorage`; the raw admin password stays in the input variable, is cleared after login, and historical `adminAuth` localStorage is removed when Contact Mode is entered. Production is unhealthy when no secure administrator mechanism is configured. `DISABLE_ADMIN_PASSWORD_CHECK=true` is rejected in Contact Mode unless `E2E_TEST_MODE=true`.
 
 ## Browser and content safety
 
@@ -16,7 +16,7 @@ Production is unhealthy when neither administrator mechanism is configured. `DIS
 
 ## Mail and object safety
 
-- MIME is parsed once on ingress. List APIs query indexed metadata and never return raw EML, full bodies, attachment bytes, R2 keys, or idempotency keys.
+- The Worker captures trusted `received_at` on ingress before MIME parsing. A valid sender-controlled MIME `Date` is retained only as nullable `sender_date`; invalid/missing sender dates never replace server receive time. List APIs query indexed metadata and never return raw EML, full bodies, attachment bytes, R2 keys, or idempotency keys.
 - Raw EML and attachment objects use server-generated R2 keys. User filenames are metadata only.
 - Raw/attachment downloads re-check administrator authentication and object ownership, set private/no-store caching and `X-Content-Type-Options: nosniff`, and force active MIME types to download as `application/octet-stream`.
 - Both response headers and client-side save names reduce filenames to a bounded leaf name and remove control characters.
@@ -30,15 +30,16 @@ Production is unhealthy when neither administrator mechanism is configured. `DIS
 - An outbound intent is committed before delivery and claimed with compare-and-set. A reused idempotency key cannot create a second attempt.
 - Explicit acceptance becomes `sent`, explicit rejection becomes `failed`, and uncertain completion becomes `unknown`. Unknown is never automatically retried or sent through a fallback provider.
 - Failed Retry is manual. Unknown Force Resend requires confirmation and creates a new linked intent and Message-ID, preserving the original audit record.
+- Resend/Brevo calls use an explicit AbortController timeout (`CONTACT_PROVIDER_HTTP_TIMEOUT_MS`, default 15000 ms, accepted range 1000–60000). Timeout is `unknown`, `retryable=false`, `network_timeout` / `PROVIDER_TIMEOUT`; it cannot trigger fallback or ordinary Retry.
 
 ## Operational safety
 
 DNS checks are read-only and use DNS-over-HTTPS. Resolver failures are `unknown`; multiple SPF records are `invalid`, and the UI never suggests adding a second SPF record. DKIM requires an explicit selector and is never guessed.
 
-Stale `sending` reconciliation only changes the intent and open attempt to `unknown`; it never calls a provider. Database migrations are additive, numeric, independent of the upstream DB version, and do not drop Legacy tables.
+Stale `sending` reconciliation only changes the intent and open attempt to `unknown`; it never calls a provider. Persisted-message side effects run through `waitUntil` with independent durable status rows; errors are reduced to class/code metadata and logs must not contain bodies, raw EML, credentials, provider keys, SMTP passwords, or complete auth headers. Database migrations are additive, numeric, independent of the upstream DB version, and do not drop Legacy tables.
 
 ## Verification coverage
 
-Unit and E2E coverage includes capability gates, administrator configuration, origin rejection and preflight headers, HTML/script/remote-image behavior in a real browser, malicious SVG attachment download, path/control-character filenames, secret redaction, CRLF headers, provider timeout classification, idempotency races, Unknown retry denial, stale reconciliation, and Legacy cleanup preservation.
+Unit and E2E coverage includes Contact session scope/expiry/storage isolation, bypass attempts, trusted receive time, migration backfill/failure behavior, per-effect fault injection, default Mailbox corruption, global-count isolation, origin rejection, HTML/remote-image behavior, malicious attachments, secret redaction, CRLF headers, Resend/Brevo timeout classification, idempotency races, Unknown retry denial, stale reconciliation, and Legacy cleanup preservation.
 
 No real provider Secret, provider endpoint, production D1/R2 resource, DNS mutation API, deployment, or remote push was used during V1 implementation.

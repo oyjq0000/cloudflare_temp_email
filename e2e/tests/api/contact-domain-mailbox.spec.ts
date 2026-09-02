@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-import { WORKER_CONTACT_URL } from '../../fixtures/test-helpers';
+import { getContactAdminHeaders, WORKER_CONTACT_URL } from '../../fixtures/test-helpers';
 
-const ADMIN_HEADERS = { 'x-admin-auth': 'e2e-contact-admin' };
+const ADMIN_HEADERS = await getContactAdminHeaders();
 
 test.describe.serial('Contact Domain and Mailbox management', () => {
   test.beforeEach(() => {
@@ -22,8 +22,8 @@ test.describe.serial('Contact Domain and Mailbox management', () => {
     expect(first.ok()).toBe(true);
     expect(await first.json()).toMatchObject({
       ok: true,
-      currentVersion: 5,
-      targetVersion: 5,
+      currentVersion: 7,
+      targetVersion: 7,
       pending: [],
     });
 
@@ -32,9 +32,9 @@ test.describe.serial('Contact Domain and Mailbox management', () => {
     });
     expect(second.ok()).toBe(true);
     const secondBody = await second.json();
-    expect(secondBody.currentVersion).toBe(5);
+    expect(secondBody.currentVersion).toBe(7);
     expect(secondBody.pending).toEqual([]);
-    expect(secondBody.applied).toHaveLength(5);
+    expect(secondBody.applied).toHaveLength(7);
 
     const legacyAfter = await (await request.get(`${WORKER_CONTACT_URL}/admin/db_version`, {
       headers: ADMIN_HEADERS,
@@ -109,6 +109,85 @@ test.describe.serial('Contact Domain and Mailbox management', () => {
       data: { domain_id: domain.id + 1 },
     });
     expect(moveMailbox.status()).toBe(409);
+  });
+
+
+  test('enforces default Mailbox usability and atomic default switching', async ({ request }) => {
+    const run = Date.now();
+    const domainResponse = await request.post(`${WORKER_CONTACT_URL}/admin/contact/domains`, {
+      headers: ADMIN_HEADERS,
+      data: { domain: `default-invariant-${run}.example.com`, name: 'Default invariant' },
+    });
+    expect(domainResponse.status(), await domainResponse.text()).toBe(201);
+    const domain = (await domainResponse.json()).result;
+    let mailboxes = (await (await request.get(
+      `${WORKER_CONTACT_URL}/admin/contact/mailboxes?domain_id=${domain.id}`,
+      { headers: ADMIN_HEADERS },
+    )).json()).results;
+    const originalDefault = mailboxes[0];
+    expect(originalDefault).toMatchObject({ is_default: true, enabled: true, outbound_enabled: true });
+
+    for (const patch of [{ enabled: false }, { outbound_enabled: false }]) {
+      const response = await request.patch(
+        `${WORKER_CONTACT_URL}/admin/contact/mailboxes/${originalDefault.id}`,
+        { headers: ADMIN_HEADERS, data: patch },
+      );
+      expect(response.status()).toBe(409);
+    }
+
+    const disabledDefault = await request.post(`${WORKER_CONTACT_URL}/admin/contact/mailboxes`, {
+      headers: ADMIN_HEADERS,
+      data: { domain_id: domain.id, local_part: 'disabled-default', enabled: false, is_default: true },
+    });
+    expect(disabledDefault.status()).toBe(409);
+
+    const outboundDisabledDefault = await request.post(`${WORKER_CONTACT_URL}/admin/contact/mailboxes`, {
+      headers: ADMIN_HEADERS,
+      data: { domain_id: domain.id, local_part: 'outbound-disabled-default', outbound_enabled: false, is_default: true },
+    });
+    expect(outboundDisabledDefault.status()).toBe(409);
+
+    const disabled = (await (await request.post(`${WORKER_CONTACT_URL}/admin/contact/mailboxes`, {
+      headers: ADMIN_HEADERS,
+      data: { domain_id: domain.id, local_part: 'disabled', enabled: false },
+    })).json()).result;
+    expect((await request.patch(`${WORKER_CONTACT_URL}/admin/contact/mailboxes/${disabled.id}`, {
+      headers: ADMIN_HEADERS, data: { is_default: true },
+    })).status()).toBe(409);
+
+    const outboundDisabled = (await (await request.post(`${WORKER_CONTACT_URL}/admin/contact/mailboxes`, {
+      headers: ADMIN_HEADERS,
+      data: { domain_id: domain.id, local_part: 'no-outbound', outbound_enabled: false },
+    })).json()).result;
+    expect((await request.patch(`${WORKER_CONTACT_URL}/admin/contact/mailboxes/${outboundDisabled.id}`, {
+      headers: ADMIN_HEADERS, data: { is_default: true },
+    })).status()).toBe(409);
+
+    const usableA = (await (await request.post(`${WORKER_CONTACT_URL}/admin/contact/mailboxes`, {
+      headers: ADMIN_HEADERS, data: { domain_id: domain.id, local_part: 'usable-a' },
+    })).json()).result;
+    const usableB = (await (await request.post(`${WORKER_CONTACT_URL}/admin/contact/mailboxes`, {
+      headers: ADMIN_HEADERS, data: { domain_id: domain.id, local_part: 'usable-b' },
+    })).json()).result;
+    await Promise.all([
+      request.patch(`${WORKER_CONTACT_URL}/admin/contact/mailboxes/${usableA.id}`, { headers: ADMIN_HEADERS, data: { is_default: true } }),
+      request.patch(`${WORKER_CONTACT_URL}/admin/contact/mailboxes/${usableB.id}`, { headers: ADMIN_HEADERS, data: { is_default: true } }),
+    ]);
+
+    mailboxes = (await (await request.get(
+      `${WORKER_CONTACT_URL}/admin/contact/mailboxes?domain_id=${domain.id}`,
+      { headers: ADMIN_HEADERS },
+    )).json()).results;
+    const defaults = mailboxes.filter((item: any) => item.is_default);
+    expect(defaults).toHaveLength(1);
+    expect(defaults[0].enabled).toBe(true);
+    expect(defaults[0].outbound_enabled).toBe(true);
+    expect(mailboxes.find((item: any) => item.id === originalDefault.id).is_default).toBe(false);
+
+    const domains = (await (await request.get(`${WORKER_CONTACT_URL}/admin/contact/domains`, {
+      headers: ADMIN_HEADERS,
+    })).json()).results;
+    expect(domains.find((item: any) => item.id === domain.id).default_mailbox_id).toBe(defaults[0].id);
   });
 
   test('supports at least 50 private Domains without exposing them publicly', async ({ request }) => {

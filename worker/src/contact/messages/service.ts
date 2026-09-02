@@ -146,7 +146,7 @@ export const listContactMessages = async (db: D1Database, filters: MessageListFi
     const last = page.at(-1)
 
     const countsWhere = buildWhere(filters, { includeFolderRead: false, includeCursor: false })
-    const counts = await db.prepare(`
+    const filteredCounts = await db.prepare(`
         SELECT
             SUM(CASE WHEN m.folder = 'inbox' THEN 1 ELSE 0 END) AS inbox,
             SUM(CASE WHEN m.folder = 'inbox' AND m.is_read = 0 THEN 1 ELSE 0 END) AS unread,
@@ -159,10 +159,10 @@ export const listContactMessages = async (db: D1Database, filters: MessageListFi
         nextCursor: hasMore && last
             ? encodeContactMessageCursor({ receivedAt: last.received_at, id: last.id })
             : null,
-        counts: {
-            inbox: counts?.inbox || 0,
-            unread: counts?.unread || 0,
-            spam: counts?.spam || 0,
+        filteredCounts: {
+            inbox: filteredCounts?.inbox || 0,
+            unread: filteredCounts?.unread || 0,
+            spam: filteredCounts?.spam || 0,
         },
     }
 }
@@ -224,4 +224,20 @@ export const setContactMessageSpam = async (db: D1Database, id: number, isSpam: 
         throw new ContactError('CONTACT_MESSAGE_NOT_FOUND', 'Contact message was not found', 404)
     }
     return getContactMessage(db, id)
+}
+
+
+export const getGlobalContactMessageCounts = async (db: D1Database) => {
+    const counts = await db.prepare(`
+        SELECT
+            SUM(CASE WHEN folder = 'inbox' THEN 1 ELSE 0 END) AS inbox,
+            SUM(CASE WHEN folder = 'inbox' AND is_read = 0 THEN 1 ELSE 0 END) AS unread,
+            SUM(CASE WHEN folder = 'spam' THEN 1 ELSE 0 END) AS spam
+        FROM contact_messages
+    `).first<{ inbox: number | null, unread: number | null, spam: number | null }>()
+    return {
+        inbox: counts?.inbox || 0,
+        unread: counts?.unread || 0,
+        spam: counts?.spam || 0,
+    }
 }

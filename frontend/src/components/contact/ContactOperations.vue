@@ -16,12 +16,12 @@ const reconciling = ref(false)
 const copy = computed(() => locale.value === 'zh' ? {
   title: '运行健康与 DNS', refresh: '刷新 DNS', selector: 'DKIM Selector（必填）',
   reconcile: '调和超时发送', noChecks: '尚未检查。选择域名并填写明确的 DKIM selector。',
-  db: '数据库', storage: '私有存储', security: '管理员安全', stale: '超时 Sending',
+  db: '数据库', storage: '私有存储', security: '管理员安全', stale: '超时 Sending', readiness: '生产就绪', effects: '副作用失败', defaults: '默认 Mailbox 异常',
   confirm: '把 15 分钟前仍处于 sending 的记录标记为 unknown？系统不会自动重发。',
 } : {
   title: 'Operations health & DNS', refresh: 'Refresh DNS', selector: 'DKIM selector (required)',
   reconcile: 'Reconcile stale sends', noChecks: 'No checks yet. Select a Domain and provide an explicit DKIM selector.',
-  db: 'Database', storage: 'Private storage', security: 'Admin security', stale: 'Stale sending',
+  db: 'Database', storage: 'Private storage', security: 'Admin security', stale: 'Stale sending', readiness: 'Production ready', effects: 'Side-effect failures', defaults: 'Default mailbox errors',
   confirm: 'Mark sends still running after 15 minutes as unknown? They will not be retried automatically.',
 })
 
@@ -64,6 +64,9 @@ onMounted(async () => { await Promise.all([loadHealth(), loadDns()]) })
         <n-statistic :label="copy.storage" :value="health.storage?.bindingAvailable ? 'R2' : 'D1 fallback'" />
         <n-statistic :label="copy.security" :value="health.adminSecurity?.code || 'Unknown'" />
         <n-statistic :label="copy.stale" :value="health.counts?.staleSending || 0" />
+        <n-statistic :label="copy.readiness" :value="health.productionReady ? 'Ready' : 'Not ready'" />
+        <n-statistic :label="copy.effects" :value="health.counts?.sideEffectFailed || 0" />
+        <n-statistic :label="copy.defaults" :value="(health.counts?.invalidDefaultMailboxCount || 0) + (health.counts?.multipleDefaultMailboxCount || 0) + (health.counts?.danglingDefaultMailboxCount || 0)" />
       </div>
       <template #footer>
         <n-button type="warning" secondary :loading="reconciling" @click="reconcile">{{ copy.reconcile }}</n-button>

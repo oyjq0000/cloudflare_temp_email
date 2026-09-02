@@ -6,12 +6,13 @@ import i18n from '../i18n'
 import { getFingerprint } from '../utils/fingerprint'
 import { safeBearerHeader, safeHeaderValue } from '../utils/headers'
 import { sanitizeHtml } from '../utils/sanitize-html'
+import { clearLegacyContactAdminPassword, isContactAdminApiPath } from '../utils/contact-auth'
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 const {
     loading, auth, jwt, settings, openSettings,
     userOpenSettings, userSettings, announcement,
-    showAuth, adminAuth, showAdminAuth, userJwt
+    showAuth, adminAuth, contactAdminToken, showAdminAuth, userJwt
 } = useGlobalState();
 
 const instance = axios.create({
@@ -41,11 +42,16 @@ const apiFetch = async (path, options = {}) => {
         if (userAccessHeader) headers['x-user-access-token'] = userAccessHeader;
         const customAuthHeader = safeHeaderValue(auth.value);
         if (customAuthHeader) headers['x-custom-auth'] = customAuthHeader;
-        const adminAuthHeader = safeHeaderValue(adminAuth.value);
-        if (adminAuthHeader) headers['x-admin-auth'] = adminAuthHeader;
+        const contactAdminPath = isContactAdminApiPath(path);
+        if (!contactAdminPath) {
+            const adminAuthHeader = safeHeaderValue(adminAuth.value);
+            if (adminAuthHeader) headers['x-admin-auth'] = adminAuthHeader;
+        }
         const idempotencyHeader = safeHeaderValue(options.idempotencyKey);
         if (idempotencyHeader) headers['Idempotency-Key'] = idempotencyHeader;
-        const authorizationHeader = safeBearerHeader(jwt.value);
+        const authorizationHeader = safeBearerHeader(
+            contactAdminPath ? contactAdminToken.value : jwt.value
+        );
         if (authorizationHeader) headers['Authorization'] = authorizationHeader;
 
         const response = await instance.request(path, {
@@ -121,6 +127,9 @@ const getOpenSettings = async (message, notification) => {
             statusUrl: res["statusUrl"] || "",
             enableGlobalTurnstileCheck: res["enableGlobalTurnstileCheck"] || false,
         });
+        if (mode === 'contact') {
+            clearLegacyContactAdminPassword(adminAuth);
+        }
         if (openSettings.value.needAuth) {
             showAuth.value = true;
         }

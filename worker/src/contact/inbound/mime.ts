@@ -26,7 +26,7 @@ export type ContactParsedMime = {
     messageId: string | null
     inReplyTo: string | null
     references: string[]
-    receivedAt: string
+    senderDate: string | null
     attachments: ContactParsedAttachment[]
     contentTruncated: boolean
 }
@@ -73,9 +73,10 @@ const normalizedHeaders = (headers: Header[]): Array<{ key: string, value: strin
         value: header.value.slice(0, MAX_HEADER_CHARS),
     }))
 
-const receivedAt = (value: string | undefined): string => {
-    const date = value ? new Date(value) : new Date()
-    return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString()
+export const normalizeSenderDate = (value: string | undefined | null): string | null => {
+    if (!value) return null
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
 const textPreview = (text: string, html: string): string => (text || html.replace(/<[^>]+>/g, ' '))
@@ -104,7 +105,7 @@ export const parseContactMime = async (raw: ArrayBuffer): Promise<ContactParsedM
         messageId: parsed.messageId?.trim() || null,
         inReplyTo: parsed.inReplyTo?.trim() || null,
         references: (parsed.references || '').split(/\s+/).filter(Boolean).slice(-100),
-        receivedAt: receivedAt(parsed.date),
+        senderDate: normalizeSenderDate(parsed.date),
         attachments: parsed.attachments.map(attachment => ({
             filename: safeAttachmentFilename(attachment.filename),
             mimeType: safeMimeType(attachment.mimeType),

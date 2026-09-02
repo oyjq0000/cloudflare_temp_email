@@ -1,4 +1,4 @@
-import { acceptedHttpResult, parseJsonResponse, rejectedHttpResult } from './http.ts'
+import { acceptedHttpResult, parseJsonResponse, providerHttpFetch, rejectedHttpResult } from './http.ts'
 import {
     configurationFailure,
     providerExceptionResult,
@@ -21,7 +21,7 @@ export class BrevoProvider implements OutboundProvider {
     async send(message: OutboundMessage, runtime: ProviderRuntimeConfig): Promise<ProviderSendResult> {
         if (!runtime.secrets.apiKey) return configurationFailure('BREVO_API_KEY_MISSING')
         try {
-            const response = await this.fetcher(this.endpoint, {
+            const response = await providerHttpFetch(this.fetcher, this.endpoint, {
                 method: 'POST',
                 headers: { 'api-key': runtime.secrets.apiKey, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -41,7 +41,7 @@ export class BrevoProvider implements OutboundProvider {
                             : {}
                     ),
                 }),
-            })
+            }, runtime.httpTimeoutMs || 15_000)
             if (!response.ok) return rejectedHttpResult(response.status)
             return acceptedHttpResult((await parseJsonResponse(response)).messageId)
         } catch (error) { return providerExceptionResult(error) }
