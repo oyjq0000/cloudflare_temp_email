@@ -1,0 +1,102 @@
+name: Contact Hub RC
+
+on:
+  pull_request:
+    branches:
+      - contact-hub
+      - main
+  push:
+    branches:
+      - contact-hub
+      - 'fix/contact-hub-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  worker:
+    name: Worker unit, lint, dry-run build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.10.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: worker/pnpm-lock.yaml
+      - name: Install Worker dependencies
+        working-directory: worker
+        run: pnpm install --frozen-lockfile
+      - name: Worker tests
+        working-directory: worker
+        run: pnpm test
+      - name: Worker lint
+        working-directory: worker
+        run: pnpm run lint
+      - name: Worker dry-run build
+        working-directory: worker
+        run: pnpm run build
+
+  frontend:
+    name: Frontend unit and production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.10.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install Frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Frontend tests
+        working-directory: frontend
+        run: pnpm test -- --run
+      - name: Frontend production build
+        working-directory: frontend
+        run: pnpm run build
+
+  contact-and-temp-e2e:
+    name: Contact + Temp Docker E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - name: Install E2E runner dependencies
+        working-directory: e2e
+        run: npm ci
+      - name: Validate Compose configuration
+        working-directory: e2e
+        run: docker compose config --quiet
+      - name: Run Contact and Temp regression suite
+        working-directory: e2e
+        run: npm test
+      - name: Upload Playwright reports and results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: contact-hub-rc-playwright-${{ github.run_id }}
+          path: |
+            e2e/test-results/
+            e2e/playwright-report/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Cleanup Compose resources
+        if: always()
+        working-directory: e2e
+        run: docker compose down -v
