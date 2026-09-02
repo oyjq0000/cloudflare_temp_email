@@ -19,6 +19,8 @@ Keep ordinary variables in the reviewed Wrangler environment and values with cre
 CONTACT_MAIL_MODE = true
 CONTACT_ALLOWED_ORIGINS = ["https://mail.example.com"]
 CONTACT_DNS_CACHE_TTL_SECONDS = 3600
+CONTACT_ADMIN_SESSION_TTL_SECONDS = 14400 # 900-28800
+CONTACT_PROVIDER_HTTP_TIMEOUT_MS = 15000 # 1000-60000
 # Use this only when administrator accounts/roles are the chosen login mechanism.
 ADMIN_USER_ROLE = "admin"
 DISABLE_ADMIN_PASSWORD_CHECK = false
@@ -36,10 +38,11 @@ bucket_name = "private-contact-mail"
 Requirements:
 
 - Set exactly one Contact-mode switch: `CONTACT_MAIL_MODE=true`.
-- Configure `ADMIN_PASSWORDS` as a Worker Secret or use a verified `ADMIN_USER_ROLE`. Never enable `DISABLE_ADMIN_PASSWORD_CHECK` in production.
+- Configure `ADMIN_PASSWORDS` as a Worker Secret or use a verified `ADMIN_USER_ROLE`. Password-based Contact login exchanges the password for a scoped Contact Admin Session; the browser must not persist the raw password. Never enable `DISABLE_ADMIN_PASSWORD_CHECK` in production.
 - Set `JWT_SECRET` as credential material using the deployment system's secret facility even if an existing template shows it as a variable.
 - Keep `E2E_TEST_MODE` absent/false in production. It exposes only test helpers when true.
 - `CONTACT_ALLOWED_ORIGINS` accepts exact origins only. Do not use `*`, a path, query, credentials, or a trailing application route.
+- `CONTACT_ADMIN_SESSION_TTL_SECONDS` defaults to 14400 seconds and is constrained to 900–28800. `CONTACT_PROVIDER_HTTP_TIMEOUT_MS` defaults to 15000 ms and is constrained to 1000–60000; HTTP timeout remains an Unknown delivery outcome.
 - `CONTACT_DNS_CACHE_TTL_SECONDS` accepts 60–86400 seconds and defaults to 3600.
 - `DOMAINS`/`DEFAULT_DOMAINS` remain Legacy Temp settings; they do not create Contact Domains or Mailboxes.
 - `CONTACT_R2` must point to a private bucket. Do not expose the bucket through a public custom domain.
@@ -122,9 +125,9 @@ Resend/Brevo endpoints are fixed in code. SMTP host/port/TLS fields are non-secr
 1. Create a private staging R2 bucket and bind it as `CONTACT_R2`.
 2. Deploy reviewed code/config to staging only after human authorization; leave production untouched.
 3. Authenticate as an administrator and call `GET /admin/contact/db/version`.
-4. Call `POST /admin/contact/db/migrate`. Repeat it once and confirm the second call is a no-op with target version 5.
+4. Call `POST /admin/contact/db/migrate`. Repeat it once and confirm the second call is a no-op with target version 7.
 5. Confirm upstream tables/data and the upstream DB version remain unchanged.
-6. Check `GET /admin/contact/storage/status` and `GET /admin/contact/health`; migration, D1, R2, and administrator security must be healthy.
+6. Check `GET /admin/contact/storage/status` and `GET /admin/contact/health`; require `adminReady`, `migrationReady`, `storageReady`, `inboundReady`, and `productionReady` to match the intended staging topology. `outboundReady` is reported separately and requires an enabled Provider, a Domain bound to a Provider with its runtime Secret present, and an enabled outbound Mailbox.
 7. Create Provider Configs, then Domains and their fixed Mailboxes. Assign one explicit Provider Config to each Domain.
 8. Run an inbound Email Routing smoke message, metadata-only list/detail check, safe HTML/remote-image check, attachment download, and outbound Mailpit/sandbox-provider test.
 9. Exercise Failed Retry, an injected Unknown outcome, Force Resend warning, and stale-Sending reconciliation without using a real customer recipient.
@@ -151,7 +154,7 @@ Only after staging and review:
 2. Create/bind the private production `CONTACT_R2` bucket.
 3. Add the approved Worker Secrets and exact frontend origins.
 4. Deploy the reviewed Worker/frontend revision under human authorization.
-5. Authenticate and run the Contact migration once; verify version 5 and re-run to prove idempotency.
+5. Authenticate and run the Contact migration once; verify version 7 and re-run to prove idempotency.
 6. Verify health/storage before enabling Email Routing rules.
 7. Create Provider Configs, Domains, and Mailboxes, then bind Email Routing one Domain at a time.
 8. Execute the staging smoke checklist against non-sensitive test recipients.
@@ -159,7 +162,7 @@ Only after staging and review:
 
 ## 8. Rollback
 
-Code rollback is preferred because Contact migrations are additive and backward-compatible with Temp Mode.
+Code rollback is preferred because Contact migrations 6–7 are additive and Temp Mode ignores the new Contact columns/table. Do not downgrade or delete `sender_date` or `contact_message_side_effects`; preserve D1/R2 and roll code forward after diagnosis if an older Contact build cannot understand schema 7.
 
 1. Stop adding Domains/routing rules and capture health/outbound state. Do not resend Unknown messages.
 2. Roll back Worker/frontend code to the previously recorded revision under normal deployment review.
@@ -185,6 +188,6 @@ Code rollback is preferred because Contact migrations are additive and backward-
 - [ ] Provider Domains verified
 - [ ] Email Routing points only reviewed fixed addresses to the Worker
 - [ ] MX/SPF/DKIM/DMARC manually verified
-- [ ] Contact migration version 5 applied and idempotency verified in staging
+- [ ] Contact migration version 7 applied and idempotency verified in staging
 - [ ] Inbound/outbound/security smoke tests passed
 - [ ] Unknown/rollback procedure rehearsed

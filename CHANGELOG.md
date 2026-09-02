@@ -24,6 +24,11 @@
 
 ### Bug Fixes
 
+- fix: |Contact Hub| 管理员密码登录改为短期 `contact:admin` Session Token，前端仅存 `sessionStorage` 并清理历史 `adminAuth` 明文；Contact API 不再接受 `x-admin-auth`
+- fix: |Contact Hub| `received_at` 改为可信 Worker 收件时间，新增 `sender_date` 保存 MIME Date；持久化后的转发/AI/Telegram/Webhook/Worker/自动回复改为 `waitUntil` 独立故障边界并记录状态
+- fix: |Contact Hub| 强制默认 Mailbox 可用性/唯一性，拆分全局 Inbox 计数，完善多维 Health readiness 与默认 Mailbox 一致性诊断
+- fix: |Contact Hub| Provider UI 支持编辑和重新启用；Resend/Brevo 增加 15 秒可配置 HTTP 超时，超时保持 Unknown、禁止自动 Retry/Fallback
+
 - fix: |E2E| 强制 Linux 容器 Shell 入口脚本使用 LF 行尾，避免 Windows 检出后出现 `bash\r` / `pipefail\r` 启动失败
 - fix: |E2E| 为 Contact 浏览器套件增加独立的 Contact Worker 前端代理，避免全量 Compose 误用 Temp 前端触发模式重定向
 - fix: |Contact Hub| 收件箱并发筛选采用最新请求优先，避免初始加载覆盖用户筛选；浏览器回归同时校验筛选响应，并将独立 Contact 前端 Origin 加入本地写操作允许列表
@@ -40,6 +45,8 @@
 - feat: |发信页面| 优化用户和 Admin 发信页面的信息层级与响应式布局，增加正文格式工具栏、草稿状态、底部发送操作区及隔离的 HTML 预览
 
 ### Testing
+
+- test: |Contact Hub| 新增 schema 6/7 backfill、认证越权、收件时间、逐副作用故障注入、默认 Mailbox 并发/损坏、Provider 超时/编辑及 Contact+Temp RC CI 回归覆盖
 
 - test: |Contact Hub| 覆盖 Temp/Contact 模式解析、公共路由封锁、生产 Admin 配置校验、前端模式重定向，并增加独立 Contact Worker E2E 配置与 API 门禁用例
 - test: |Contact Hub| 覆盖迁移幂等及上游版本隔离、Domain/Mailbox 约束、地址同步、50 Domain、公开配置脱敏和 Legacy Cleanup 保护

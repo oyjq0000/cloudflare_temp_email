@@ -12,7 +12,7 @@ oyjq0000/main (upstream mirror, no Contact product commits)
 oyjq0000/contact-hub (long-lived product branch)
 ```
 
-V1 started from `f92b059aac0d89e2c106601b6857dce9dcae07d3`; local `main`, `origin/main`, and `upstream/main` all pointed to that commit when implementation began. The first reviewed post-V1 synchronization advanced all three locally recorded mirror refs to `70206c61efa723ef24143eca1d27449ce98a6e0c` (`feat: add single-mail read status (#1125)`) and merged that history through `codex/contact-hub-upstream-integration`. No push, force-push, deployment, production mutation, or production Secret access was performed.
+V1 originally started from `f92b059...`. The RC hardening session re-fetched the remote and used `origin/main=70206c61efa723ef24143eca1d27449ce98a6e0c`, `origin/contact-hub=a4902cdd190ea1752de01370a9593562e0a45d58`, and merge-base `70206c61efa723ef24143eca1d27449ce98a6e0c` as the real baseline. RC work is isolated on `fix/contact-hub-rc-hardening`; it does not rewrite `contact-hub` or `main` history.
 
 ## Completed synchronization: mail read status
 
@@ -22,7 +22,7 @@ The `f92b059..70206c6` upstream range added single-mail read status, a migration
 - Contact Mode returns `enableMailReadStatus=false` because public mailbox surfaces are disabled and Contact read state remains under authenticated `/admin/contact/*` APIs.
 - The Email Worker dispatches Contact ingestion before Legacy `storeRawMail`; Temp Mode uses the upstream raw-mail storage helper unchanged.
 - Contact changelog entries and upstream read-status entries are both retained.
-- The complete fresh-volume Compose suite passed 196/196, followed by Worker 41/41/lint/build, Frontend 67/67/build, Compose config, LF, and whitespace gates.
+- Historical pre-RC evidence: the earlier fresh-volume suite passed 196/196 with Worker 41/41 and Frontend 67/67. Those counts are superseded for RC acceptance by `RC_HARDENING_REPORT.md`.
 
 During the full-topology run, LF shell enforcement, a Contact-specific frontend proxy/exact local Origin, and latest-request-wins Inbox loading were added. These are integration hardening changes, not production Cloudflare configuration.
 
@@ -57,13 +57,13 @@ Do not use `reset --hard`, `clean`, force-push, or automatic conflict resolution
 | `worker/src/worker.ts` | middleware and route ordering | Contact public gates run before Legacy handlers; Contact CORS remains scoped |
 | `worker/src/email/index.ts` | Email Worker entry pipeline | mode dispatch; Contact fixed-recipient lookup; stop side effects after D1 failure |
 | `worker/src/commom_api.ts` | public settings | capability booleans only; never expose Contact Domains/Mailboxes/Providers |
-| `worker/src/types.d.ts` | bindings and variables | `CONTACT_R2`, mode/origin/DNS variables, dynamic Secret resolution |
+| `worker/src/types.d.ts` | bindings and variables | `CONTACT_R2`, mode/origin/DNS variables, Contact Admin Session TTL, Provider HTTP timeout, dynamic Secret resolution |
 | `worker/src/common.ts` | address cleanup and helpers | Contact-owned fixed addresses are never deleted |
 | `worker/src/scheduled.ts` | scheduled cleanup | Contact Mailboxes/messages/outbound history remain outside Legacy retention |
 | `worker/src/admin_api/address.ts` and admin cleanup APIs | direct deletion/custom SQL | ownership protection and Contact custom-SQL denial remain authoritative |
 | `worker/src/mails_api/send_mail_api.ts` | Legacy provider order | Temp selection/order is unchanged; Contact never enters this implicit router |
-| `worker/src/mail_providers/` | extracted shared adapters | provider result classification remains accepted/rejected/unknown |
-| `worker/src/admin_api/index.ts` | route mount/test helpers | Contact routes stay authenticated; E2E seed remains `E2E_TEST_MODE`-guarded |
+| `worker/src/mail_providers/` | Legacy/shared upstream adapters only | Temp provider behavior remains upstream-owned; Contact adapters live in `worker/src/contact/providers/` |
+| `worker/src/admin_api/index.ts` | route mount/test helpers | Contact routes stay authenticated by scoped Contact session or `ADMIN_USER_ROLE`; E2E helpers remain `E2E_TEST_MODE`-guarded |
 | `frontend/src/App.vue` | mode-aware shell | Contact has no Temp marketing/public mailbox/footer surfaces |
 | `frontend/src/router/index.js` | redirect and access routing | Contact `/` and public user routes cannot expose Temp UI |
 | `frontend/src/store/index.js` | persisted auth/mode state | mode transitions do not leak stale public state |
@@ -78,7 +78,8 @@ Upstream may add new public endpoints. Every sync must enumerate `/api/*`, `/ext
 Prefer implementing Contact business behavior under:
 
 - `worker/src/contact/`
-- `worker/src/mail_providers/`
+- `worker/src/contact/providers/` (Contact provider contracts/adapters/registry/Secret Resolver)
+- `worker/src/mail_providers/` only where shared Legacy Temp adapters remain upstream-owned
 - `frontend/src/views/contact/`
 - `frontend/src/components/contact/`
 - `frontend/src/api/contact.js`
@@ -91,8 +92,8 @@ Keep upstream files as thin mounts, gates, and adapters. Do not rename legacy `c
 
 - [ ] `CONTACT_MAIL_MODE=false` Temp core API/UI tests pass
 - [ ] Contact public capability matrix still returns 403
-- [ ] Contact administrator auth/security health passes
-- [ ] Contact migrations remain independent from upstream DB version and idempotent
+- [ ] Contact Admin Session scope/expiry/storage isolation and administrator security health pass
+- [ ] Contact schema target 7 remains independent from upstream DB version; v5→v7 backfill and repeated migration are idempotent
 - [ ] MIME is parsed once and list endpoints remain metadata-only
 - [ ] R2 objects/keys and attachment downloads remain private
 - [ ] explicit per-Domain Provider selection cannot be overridden by Legacy globals

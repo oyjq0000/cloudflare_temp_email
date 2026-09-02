@@ -24,6 +24,11 @@
 
 ### Bug Fixes
 
+- fix: |Contact Hub| Replace persisted administrator-password login with a short-lived scoped `contact:admin` session token, stored only in `sessionStorage`; clear historical `adminAuth` plaintext and reject `x-admin-auth` on Contact APIs
+- fix: |Contact Hub| Make `received_at` trusted Worker receive time, preserve MIME Date as `sender_date`, and move forward/AI/Telegram/Webhook/Worker/auto-reply behind independent `waitUntil` failure boundaries with durable status
+- fix: |Contact Hub| Enforce default Mailbox usability/uniqueness, split global Inbox counts from filtered lists, and expose explicit readiness plus default-Mailbox consistency diagnostics
+- fix: |Contact Hub| Add Provider edit/re-enable UI and explicit bounded Resend/Brevo HTTP timeouts; timeout remains Unknown and cannot trigger automatic Retry or fallback
+
 - fix: |E2E| Enforce LF endings for Linux container shell entrypoints so Windows checkouts cannot fail with `bash\r` / `pipefail\r`
 - fix: |E2E| Add a dedicated Contact Worker frontend proxy for Contact browser coverage so the full Compose run cannot redirect through the Temp frontend
 - fix: |Contact Hub| Make the latest concurrent inbox filter win so initial loading cannot overwrite user input; browser coverage now validates the filtered response and allows the dedicated Contact frontend origin for local mutations
@@ -40,6 +45,8 @@
 - feat: |Send Mail| Improve the information hierarchy and responsive layout of the user and Admin composers, with a content-format toolbar, draft status, bottom send-action area, and isolated HTML preview
 
 ### Testing
+
+- test: |Contact Hub| Add schema 6/7 backfill, auth isolation, trusted-time, per-effect fault injection, default-Mailbox corruption/concurrency, Provider timeout/edit, and Contact+Temp RC CI regression coverage
 
 - test: |Contact Hub| Cover Temp/Contact parsing, public route gates, production Admin configuration checks, and frontend mode redirects, with a dedicated Contact Worker E2E configuration and API gate suite
 - test: |Contact Hub| Cover migration idempotency and upstream-version isolation, Domain/Mailbox constraints, address synchronization, 50 Domains, public-config redaction, and Legacy Cleanup protection

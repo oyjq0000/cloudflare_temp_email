@@ -19,6 +19,8 @@ Migrations execute in numeric order, skip recorded versions, and record a versio
 3. Explicit inbound body-truncation signal.
 4. Outbound Message and Attempt state.
 5. DNS check cache.
+6. Trusted receive time (`sender_date` backfill while `received_at` becomes server/created time for legacy rows).
+7. Durable persisted-message side-effect observability.
 
 The runner is idempotent and must not drop or rewrite `raw_mails`, `address`, `sendbox`, `settings`, or upstream version data.
 
@@ -31,6 +33,8 @@ Implemented migration versions:
 | 3 | `contact_inbound_truncation_signal` | Explicit `contact_messages.content_truncated` signal for bounded D1 body indexing |
 | 4 | `contact_outbound_state_machine` | `contact_outbound_messages`, append-only `contact_outbound_attempts`, status/idempotency constraints, and lookup indexes |
 | 5 | `contact_dns_check_cache` | `contact_dns_checks` plus Domain/purpose/cache lookup indexes |
+| 6 | `contact_trusted_receive_time` | Adds nullable `contact_messages.sender_date`; backfills it from the old `received_at`, then backfills trusted `received_at` from `created_at` without deleting old sender-declared time |
+| 7 | `contact_message_side_effect_tracking` | Adds `contact_message_side_effects`, unique `(message_id,effect)`, status/attempt/error metadata, and status/message indexes |
 
 Provider Config CRUD and Domain assignment are implemented on the version 1 tables. API serialization exposes non-secret configuration and per-secret configured booleans, never `secret_refs_json` or resolved values.
 
@@ -55,7 +59,7 @@ Invariants:
 - A mailbox address cannot cross its parent domain.
 - A domain has at most one default mailbox.
 - Contact-owned upstream addresses are protected from legacy delete and cleanup.
-- The first Mailbox for a Domain is always its default; a current default cannot be disabled until another Mailbox is selected.
+- A default Mailbox must belong to the Domain, be `enabled=1`, have `outbound_enabled=1`, agree with `contact_domains.default_mailbox_id`, and be the only `is_default=1` Mailbox for that Domain. A current default cannot be disabled or have outbound delivery disabled until another usable Mailbox is selected. Default switching updates both Mailbox flags and Domain pointer in one D1 batch.
 - Disabling does not delete messages or outbound history.
 
 ### `contact_provider_configs`
@@ -70,7 +74,7 @@ Required columns: `id`, `name`, `provider_type`, `enabled`, `config_json`, `secr
 
 One indexed Contact record maps to one legacy raw row via unique `raw_mail_id`. `dedupe_key` is independently unique for concurrent redelivery protection. Body fields are returned only by detail APIs.
 
-Required columns: `id`, `raw_mail_id`, `domain_id`, `mailbox_id`, `envelope_from`, `from_name`, `from_address`, `reply_to_address`, `to_address`, `cc_json`, `headers_json`, `subject`, `preview`, `text_body`, `html_body`, `message_id_header`, `in_reply_to_header`, `references_json`, `dedupe_key`, `folder`, `is_read`, `spam_reason`, `has_attachments`, `raw_storage_key`, `storage_status`, `parse_status`, `parse_error`, `content_truncated`, `received_at`, `created_at`, `updated_at`.
+Required columns: `id`, `raw_mail_id`, `domain_id`, `mailbox_id`, `envelope_from`, `from_name`, `from_address`, `reply_to_address`, `to_address`, `cc_json`, `headers_json`, `subject`, `preview`, `text_body`, `html_body`, `message_id_header`, `in_reply_to_header`, `references_json`, `dedupe_key`, `folder`, `is_read`, `spam_reason`, `has_attachments`, `raw_storage_key`, `storage_status`, `parse_status`, `parse_error`, `content_truncated`, `sender_date`, `received_at`, `created_at`, `updated_at`.
 
 Allowed folders are `inbox` and `spam`. Suggested indexes:
 
@@ -80,7 +84,16 @@ Allowed folders are `inbox` and `spam`. Suggested indexes:
 - `from_address`, `to_address`, `subject`
 - unique `dedupe_key`, unique `raw_mail_id`
 
-`storage_status` is `pending`, `stored`, `fallback`, or `degraded`. `fallback` means the private R2 binding is absent but the bounded D1 raw MIME is available; `degraded` means at least one object write failed or that raw fallback is incomplete. `parse_status=failed` retains raw/fallback data without running mail side effects. `content_truncated=1` makes the 512k-character D1 body indexing cap visible.
+`received_at` is trusted Worker receive time and drives Inbox sort/cursor/date filtering/statistics. `sender_date` is only the parsed sender-declared MIME Date and may be null. `storage_status` is `pending`, `stored`, `fallback`, or `degraded`. `fallback` means the private R2 binding is absent but the bounded D1 raw MIME is available; `degraded` means at least one object write failed or that raw fallback is incomplete. `parse_status=failed` retains raw/fallback data without running mail side effects. `content_truncated=1` makes the 512k-character D1 body indexing cap visible.
+
+
+### `contact_message_side_effects`
+
+Tracks the six post-persist effects for each newly stored message: `forward`, `ai_extract`, `telegram`, `webhook`, `another_worker`, and `auto_reply`. Status is `pending`, `running`, `succeeded`, `failed`, or `skipped`. No message/effect pair is created twice, and V1 does not automatically retry failed effects.
+
+Required columns: `id`, `message_id`, `effect`, `status`, `attempt_count`, `last_error_code`, `last_error_class`, `last_attempt_at`, `created_at`, `updated_at`. Error fields contain classified metadata only, never message content or credentials.
+
+Spam and parse-failed messages create `skipped` rows. Normal persisted mail starts with `pending` rows and each effect updates independently around its invocation. Duplicate inbound deliveries return before side effects are rerun.
 
 ### `contact_attachments`
 

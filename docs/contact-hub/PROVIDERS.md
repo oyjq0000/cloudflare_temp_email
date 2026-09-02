@@ -1,6 +1,6 @@
 # Contact Hub Provider Configuration
 
-Contact outbound delivery uses the Provider Config explicitly assigned to each Domain. It never discovers a Contact provider from global `RESEND_TOKEN`, `SMTP_CONFIG`, or `SEND_MAIL` settings, and it never falls back to a second provider after a failure.
+Contact outbound delivery is implemented under `worker/src/contact/providers/` and uses the Provider Config explicitly assigned to each Domain. It never discovers a Contact provider from global `RESEND_TOKEN`, `SMTP_CONFIG`, or `SEND_MAIL` settings, and it never falls back to a second provider after a failure.
 
 ## Secret references
 
@@ -25,3 +25,9 @@ SMTP stores `host`, `port`, `secure`, `starttls`, and an optional `username`. If
 Adapters return `accepted`, `rejected`, or `unknown` certainty plus retry guidance, a provider message id when available, and a sanitized error class/code/message. HTTP 2xx and a completed SMTP DATA exchange are accepted; explicit HTTP/SMTP rejection is rejected; timeout or connection loss after submission may have begun is unknown.
 
 The HTTP tests use injected local mocks and the SMTP E2E test targets Mailpit. No test uses a real Resend, Brevo, or SMTP credential.
+
+## RC management and timeout behavior
+
+The Provider UI supports create, edit, disable, and re-enable. SMTP name/host/port/secure/starttls/username can be edited without re-entering a Secret Reference; an empty Secret Reference on edit means “keep the existing reference.” API/UI surfaces expose only configured booleans plus Domain usage counts, never Secret Reference names or Secret values. A Provider assigned to a Domain cannot be disabled.
+
+Resend and Brevo use `AbortController` with `CONTACT_PROVIDER_HTTP_TIMEOUT_MS` (default 15000 ms; valid 1000–60000 ms). A timeout is reported as `certainty=unknown`, `retryable=false`, `errorClass=network_timeout`, `errorCode=PROVIDER_TIMEOUT`. It is never automatically retried and never causes provider fallback.
