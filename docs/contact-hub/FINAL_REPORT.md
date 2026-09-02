@@ -45,12 +45,12 @@ From a clean dependency reinstall using the repository lockfiles:
 - Worker: `pnpm install --frozen-lockfile`; 54/54 unit tests passed; `pnpm run lint` passed; `pnpm run build` passed as an explicit Wrangler dry-run using `worker/wrangler.ci.toml`.
 - Frontend: `pnpm install --frozen-lockfile`; 69/69 unit tests passed; production build passed with only the pre-existing chunk-size advisory.
 - E2E definition: `docker compose config --quiet` passes and Playwright discovers 206 tests in 53 files.
-- Full Docker Compose execution: pending at this report revision; do not infer pass from discovery.
-- GitHub Actions: pending at this report revision; do not infer pass until a real run URL is recorded.
+- Full Docker Compose execution on Windows: 206/206 Playwright tests passed after rebuilding the final code-validation HEAD; Compose exited 0 and was cleaned with volumes/orphans removed.
+- GitHub Actions code-validation run: https://github.com/oyjq0000/cloudflare_temp_email/actions/runs/33642554309; Worker, Frontend, and Contact + Temp Docker E2E all passed, with Docker E2E reporting 206/206.
 
 ## 7. RC CI
 
-`.github/workflows/contact-hub-rc.yml` runs on PRs to `contact-hub`/`main`, pushes to `contact-hub` and `fix/contact-hub-*`, and manual dispatch. It runs Worker test/lint/dry-run build, Frontend unit/build, strict Docker Compose Contact+Temp regression, and uploads Playwright artifacts. It does not use `continue-on-error` and does not read production Provider Secrets.
+`.github/workflows/contact-hub-rc.yml` runs on PRs to `contact-hub`/`main`, pushes to `contact-hub` and `fix/contact-hub-*`, and manual dispatch. It runs Worker test/lint/dry-run build, Frontend unit/build, strict Docker Compose Contact+Temp regression, and uploads Playwright artifacts. It does not use `continue-on-error`, both Worker and Frontend Docker dependency installs are strict `--frozen-lockfile` gates with no fallback install, and it does not read production Provider Secrets.
 
 ## 8. Security checks
 
