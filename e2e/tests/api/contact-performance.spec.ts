@@ -1,8 +1,8 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
-import { WORKER_CONTACT_URL } from '../../fixtures/test-helpers';
+import { getContactAdminHeaders, WORKER_CONTACT_URL } from '../../fixtures/test-helpers';
 
-const ADMIN_HEADERS = { 'x-admin-auth': 'e2e-contact-admin' };
+const ADMIN_HEADERS = await getContactAdminHeaders();
 const run = Date.now();
 const domains: Array<{ id: number, mailboxId: number, address: string }> = [];
 

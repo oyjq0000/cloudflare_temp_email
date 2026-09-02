@@ -1,10 +1,15 @@
+import { getContactAdminHeaders } from '../../fixtures/test-helpers';
+
 import { expect, test, type Page } from '@playwright/test';
 
 import { FRONTEND_CONTACT_URL, WORKER_CONTACT_URL } from '../../fixtures/test-helpers';
 
-const ADMIN_HEADERS = { 'x-admin-auth': 'e2e-contact-admin' };
+const ADMIN_HEADERS = await getContactAdminHeaders();
 const run = Date.now();
 const subject = `Browser Contact Safety ${run}`;
+const browserProviderName = `Browser Provider ${run}`;
+const browserInUseProviderName = `Browser In Use ${run}`;
+const browserSecretReference = 'CONTACT_BROWSER_E2E_SECRET_MISSING';
 
 const signIn = async (page: Page) => {
   await page.goto(`${FRONTEND_CONTACT_URL}/en/hub`);
@@ -44,9 +49,19 @@ test.describe.serial('Contact Hub browser safety', () => {
   test.beforeAll(async ({ request }) => {
     if (!WORKER_CONTACT_URL) return;
     await request.post(`${WORKER_CONTACT_URL}/admin/contact/db/migrate`, { headers: ADMIN_HEADERS });
+    const hiddenSecretProvider = await request.post(`${WORKER_CONTACT_URL}/admin/contact/providers`, {
+      headers: ADMIN_HEADERS,
+      data: { name: browserProviderName, provider_type: 'resend', config: {}, secret_refs: { apiKey: browserSecretReference } },
+    });
+    expect(hiddenSecretProvider.status(), await hiddenSecretProvider.text()).toBe(201);
+    expect(JSON.stringify(await hiddenSecretProvider.json())).not.toContain(browserSecretReference);
+    const inUseProvider = (await (await request.post(`${WORKER_CONTACT_URL}/admin/contact/providers`, {
+      headers: ADMIN_HEADERS,
+      data: { name: browserInUseProviderName, provider_type: 'smtp', config: { host: 'mailpit', port: 1025, secure: false, starttls: false }, secret_refs: {} },
+    })).json()).result;
     const domain = (await (await request.post(`${WORKER_CONTACT_URL}/admin/contact/domains`, {
       headers: ADMIN_HEADERS,
-      data: { domain: `browser-${run}.example.com`, name: 'Browser safety' },
+      data: { domain: `browser-${run}.example.com`, name: 'Browser safety', default_provider_config_id: inUseProvider.id },
     })).json()).result;
     const mailbox = (await (await request.get(
       `${WORKER_CONTACT_URL}/admin/contact/mailboxes?domain_id=${domain.id}`,
@@ -117,4 +132,63 @@ test.describe.serial('Contact Hub browser safety', () => {
     await expect(page.getByText('Operations health & DNS')).toBeVisible();
     await expect(page.getByText('Healthy')).toBeVisible();
   });
+
+  test('never persists the admin password and retains only the session token across refresh until logout', async ({ page }) => {
+    const contactRequestHeaders: Record<string, string>[] = [];
+    page.on('request', request => {
+      const url = new URL(request.url());
+      if (url.pathname.startsWith('/admin/contact/')) contactRequestHeaders.push(request.headers());
+    });
+    await page.addInitScript(() => localStorage.setItem('adminAuth', 'historical-plain-password'));
+    await signIn(page);
+    await expect.poll(() => contactRequestHeaders.length).toBeGreaterThan(0);
+    expect(contactRequestHeaders.some(headers => 'x-admin-auth' in headers)).toBe(false);
+    expect(contactRequestHeaders.some(headers => headers.authorization?.startsWith('Bearer '))).toBe(true);
+    const storage = await page.evaluate(() => ({
+      legacy: localStorage.getItem('adminAuth'),
+      token: sessionStorage.getItem('contactAdminToken'),
+      sessionDump: JSON.stringify(sessionStorage),
+      localDump: JSON.stringify(localStorage),
+    }));
+    expect(storage.legacy).toBeNull();
+    expect(storage.localDump).not.toContain('e2e-contact-admin');
+    expect(storage.sessionDump).not.toContain('e2e-contact-admin');
+    expect(storage.token).toBeTruthy();
+    expect(storage.token).not.toContain('e2e-contact-admin');
+
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Private Contact Mail Hub' })).toBeVisible();
+    await expect(page.getByTestId('contact-login')).toBeHidden();
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page.getByTestId('contact-login')).toBeVisible();
+    const afterLogout = await page.evaluate(() => sessionStorage.getItem('contactAdminToken'));
+    expect(afterLogout || '').toBe('');
+  });
+
+  test('edits, disables and re-enables Providers without exposing secret references, and blocks in-use disable in UI', async ({ page }) => {
+    await signIn(page);
+    await page.locator('.hub-sidebar nav').last().getByRole('button', { name: 'Providers' }).click();
+    await expect(page.getByText('Provider configs')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText(browserSecretReference);
+
+    const hiddenRow = page.locator('.provider-row', { hasText: browserProviderName });
+    await hiddenRow.getByRole('button', { name: 'Edit' }).click();
+    const modal = page.locator('.contact-modal');
+    await expect(modal.getByText(/leave blank while editing/i)).toBeVisible();
+    const editedName = `${browserProviderName} Edited`;
+    await modal.getByLabel('Name').fill(editedName);
+    await modal.getByRole('button', { name: 'Save' }).click();
+    const editedRow = page.locator('.provider-row', { hasText: editedName });
+    await expect(editedRow).toBeVisible();
+    await editedRow.getByRole('button', { name: 'Disable' }).click();
+    await expect(editedRow.getByRole('button', { name: 'Re-enable' })).toBeVisible();
+    await editedRow.getByRole('button', { name: 'Re-enable' }).click();
+    await expect(editedRow.getByRole('button', { name: 'Disable' })).toBeVisible();
+
+    const inUseRow = page.locator('.provider-row', { hasText: browserInUseProviderName });
+    await expect(inUseRow.getByText(/Used by domains: 1/)).toBeVisible();
+    await expect(inUseRow.getByRole('button', { name: 'Disable' })).toBeDisabled();
+    await expect(page.locator('body')).not.toContainText(browserSecretReference);
+  });
+
 });

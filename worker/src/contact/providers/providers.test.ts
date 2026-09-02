@@ -4,6 +4,7 @@ import test from 'node:test'
 import { BrevoProvider } from './brevo.ts'
 import { ResendProvider } from './resend.ts'
 import { SmtpProvider } from './smtp.ts'
+import { resolveProviderHttpTimeoutMs } from './http.ts'
 
 const message = {
     fromName: 'Contact Desk', fromAddress: 'contact@example.com',
@@ -65,4 +66,57 @@ test('SMTP adapter validates secrets before calling the transport and classifies
         certainty: 'rejected', retryable: false, errorClass: 'provider_rejected',
         errorCode: 'SMTP_550', errorMessage: 'SMTP server explicitly rejected the request with 550',
     })
+})
+
+
+test('HTTP provider timeout is explicit, unknown, non-retryable, and does not make a second call', async () => {
+    assert.equal(resolveProviderHttpTimeoutMs(undefined), 15_000)
+    assert.equal(resolveProviderHttpTimeoutMs(1_000), 1_000)
+    assert.equal(resolveProviderHttpTimeoutMs(60_000), 60_000)
+    assert.equal(resolveProviderHttpTimeoutMs(999), 15_000)
+    assert.equal(resolveProviderHttpTimeoutMs(60_001), 15_000)
+
+    let calls = 0
+    const hangingFetch = async () => {
+        calls += 1
+        return await new Promise<Response>(() => {})
+    }
+    const result = await new ResendProvider(hangingFetch as typeof fetch).send(message, {
+        config: {}, secrets: { apiKey: 'local-only' }, httpTimeoutMs: 1,
+    })
+    assert.deepEqual(result, {
+        certainty: 'unknown', retryable: false, errorClass: 'network_timeout',
+        errorCode: 'PROVIDER_TIMEOUT',
+        errorMessage: 'Provider request timed out with an uncertain delivery result',
+    })
+    assert.equal(calls, 1)
+})
+
+
+test('Brevo HTTP timeout is unknown and non-retryable with one request only', async () => {
+    let calls = 0
+    const hangingFetch = async () => {
+        calls += 1
+        return await new Promise<Response>(() => {})
+    }
+    const result = await new BrevoProvider(hangingFetch as typeof fetch).send(message, {
+        config: {}, secrets: { apiKey: 'local-only' }, httpTimeoutMs: 1,
+    })
+    assert.deepEqual(result, {
+        certainty: 'unknown', retryable: false, errorClass: 'network_timeout',
+        errorCode: 'PROVIDER_TIMEOUT',
+        errorMessage: 'Provider request timed out with an uncertain delivery result',
+    })
+    assert.equal(calls, 1)
+})
+
+test('HTTP providers classify 4xx, 429 and 5xx rejections without leaking secrets', async () => {
+    for (const [status, retryable] of [[400, false], [429, true], [503, true]] as const) {
+        const result = await new ResendProvider(async () => new Response('{}', { status })).send(message, {
+            config: {}, secrets: { apiKey: 'must-not-leak' }, httpTimeoutMs: 15_000,
+        })
+        assert.equal(result.certainty, 'rejected')
+        assert.equal(result.retryable, retryable)
+        assert.equal(JSON.stringify(result).includes('must-not-leak'), false)
+    }
 })

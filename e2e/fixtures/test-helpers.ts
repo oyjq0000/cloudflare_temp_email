@@ -8,6 +8,7 @@ export const WORKER_URL_ENV_OFF = process.env.WORKER_URL_ENV_OFF || '';
 export const WORKER_GZIP_URL = process.env.WORKER_GZIP_URL || '';
 export const WORKER_URL_SEND_MAIL_DOMAIN = process.env.WORKER_URL_SEND_MAIL_DOMAIN || '';
 export const WORKER_CONTACT_URL = process.env.WORKER_CONTACT_URL || '';
+export const WORKER_CONTACT_NO_BYPASS_URL = process.env.WORKER_CONTACT_NO_BYPASS_URL || '';
 export const FRONTEND_URL = process.env.FRONTEND_URL!;
 export const FRONTEND_CONTACT_URL = process.env.FRONTEND_CONTACT_URL || '';
 export const MAILPIT_API = process.env.MAILPIT_API!;
@@ -280,4 +281,33 @@ export async function deleteAddress(
   if (!res.ok()) {
     throw new Error(`Failed to delete address: ${res.status()} ${await res.text()}`);
   }
+}
+
+let contactAdminHeadersPromise: Promise<Record<string, string>> | null = null;
+
+/** Contact API auth: scoped Bearer session. x-admin-auth is retained only so the
+ * same header object can call E2E-only /admin/test/* helpers, never /admin/contact/*.
+ */
+export function getContactAdminHeaders(): Promise<Record<string, string>> {
+  if (!WORKER_CONTACT_URL) return Promise.resolve({});
+  if (!contactAdminHeadersPromise) {
+    contactAdminHeadersPromise = (async () => {
+      const plainPassword = process.env.CONTACT_ADMIN_PASSWORD || 'e2e-contact-admin';
+      const response = await fetch(`${WORKER_CONTACT_URL}/open_api/contact_admin_login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: hashPassword(plainPassword) }),
+      });
+      if (!response.ok) {
+        throw new Error(`Contact admin login failed: ${response.status} ${await response.text()}`);
+      }
+      const body = await response.json() as { token?: string };
+      if (!body.token) throw new Error('Contact admin login returned no session token');
+      return {
+        Authorization: `Bearer ${body.token}`,
+        'x-admin-auth': plainPassword,
+      };
+    })();
+  }
+  return contactAdminHeadersPromise;
 }

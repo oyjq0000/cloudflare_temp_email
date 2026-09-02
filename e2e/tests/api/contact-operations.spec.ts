@@ -1,11 +1,13 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
-import { WORKER_CONTACT_URL } from '../../fixtures/test-helpers';
+import { getContactAdminHeaders, WORKER_CONTACT_URL } from '../../fixtures/test-helpers';
 
-const ADMIN_HEADERS = { 'x-admin-auth': 'e2e-contact-admin' };
+const ADMIN_HEADERS = await getContactAdminHeaders();
 const run = Date.now();
 let domain: any;
 let mailbox: any;
+let secondMailbox: any;
+let otherMailbox: any;
 
 const post = (request: APIRequestContext, path: string, data: unknown, headers = ADMIN_HEADERS) => (
   request.post(`${WORKER_CONTACT_URL}${path}`, { headers, data })
@@ -26,6 +28,15 @@ test.describe.serial('Contact DNS and operational safety', () => {
     })).json()).result;
     mailbox = (await (await request.get(
       `${WORKER_CONTACT_URL}/admin/contact/mailboxes?domain_id=${domain.id}`, { headers: ADMIN_HEADERS },
+    )).json()).results[0];
+    secondMailbox = (await (await post(request, '/admin/contact/mailboxes', {
+      domain_id: domain.id, local_part: 'secondary-health',
+    })).json()).result;
+    const otherDomain = (await (await post(request, '/admin/contact/domains', {
+      domain: `ops-other-${run}.example.com`, name: 'Operations other',
+    })).json()).result;
+    otherMailbox = (await (await request.get(
+      `${WORKER_CONTACT_URL}/admin/contact/mailboxes?domain_id=${otherDomain.id}`, { headers: ADMIN_HEADERS },
     )).json()).results[0];
   });
 
@@ -115,6 +126,36 @@ test.describe.serial('Contact DNS and operational safety', () => {
     expect(detail.result.attempts).toHaveLength(1);
   });
 
+
+  test('health detects invalid, multiple and cross-domain dangling default Mailbox corruption', async ({ request }) => {
+    const corrupt = async (action: string, extra: Record<string, unknown> = {}) => {
+      const response = await post(request, '/admin/test/contact_default_corruption', {
+        action, domain_id: domain.id, mailbox_id: mailbox.id, ...extra,
+      });
+      expect(response.ok(), await response.text()).toBe(true);
+    };
+    const health = async () => (await (await request.get(
+      `${WORKER_CONTACT_URL}/admin/contact/health`, { headers: ADMIN_HEADERS },
+    )).json());
+
+    await corrupt('invalid');
+    expect((await health()).counts.invalidDefaultMailboxCount).toBeGreaterThanOrEqual(1);
+    await corrupt('repair');
+
+    await corrupt('cross-domain-pointer', { other_mailbox_id: otherMailbox.id });
+    expect((await health()).counts.danglingDefaultMailboxCount).toBeGreaterThanOrEqual(1);
+    await corrupt('repair');
+
+    await corrupt('multiple', { other_mailbox_id: secondMailbox.id });
+    expect((await health()).counts.multipleDefaultMailboxCount).toBeGreaterThanOrEqual(1);
+    await corrupt('repair');
+
+    const repaired = await health();
+    expect(repaired.counts.invalidDefaultMailboxCount).toBe(0);
+    expect(repaired.counts.multipleDefaultMailboxCount).toBe(0);
+    expect(repaired.counts.danglingDefaultMailboxCount).toBe(0);
+  });
+
   test('reports redacted health and legacy cleanup preserves Contact data', async ({ request }) => {
     const messageId = `<cleanup-${run}@example.net>`;
     const raw = [
@@ -134,7 +175,21 @@ test.describe.serial('Contact DNS and operational safety', () => {
       `${WORKER_CONTACT_URL}/admin/contact/health`, { headers: ADMIN_HEADERS },
     )).json();
     expect(health).toMatchObject({
-      ok: true, ready: true, database: { healthy: true },
+      ok: true,
+      ready: true,
+      codeReady: true,
+      adminReady: true,
+      migrationReady: true,
+      storageReady: true,
+      inboundReady: true,
+      outboundReady: true,
+      productionReady: true,
+      database: { healthy: true },
+      counts: {
+        invalidDefaultMailboxCount: 0,
+        multipleDefaultMailboxCount: 0,
+        danglingDefaultMailboxCount: 0,
+      },
       protections: { contactMailboxCleanupProtected: true, unknownAutomaticRetry: false },
     });
     expect(JSON.stringify(health)).not.toMatch(/secret_refs|CONTACT_[A-Z0-9_]{3,}/);

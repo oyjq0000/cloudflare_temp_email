@@ -131,6 +131,9 @@ export const receiveContactEmail = async (
     let parseStatus: 'parsed' | 'failed' = 'parsed'
     let parseError: string | null = null
     try {
+        if (getBooleanValue(env.E2E_TEST_MODE) && getBooleanValue(env.CONTACT_E2E_FORCE_PARSE_FAILURE)) {
+            throw Object.assign(new Error('Injected Contact parse failure'), { name: 'ContactParseInjectedError' })
+        }
         parsed = await parseContactMime(raw)
     } catch (error) {
         parseStatus = 'failed'

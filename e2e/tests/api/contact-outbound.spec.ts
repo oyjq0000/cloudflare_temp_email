@@ -1,3 +1,5 @@
+import { getContactAdminHeaders } from '../../fixtures/test-helpers';
+
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
 import {
@@ -8,7 +10,7 @@ import {
   onMailpitMessage,
 } from '../../fixtures/test-helpers';
 
-const ADMIN_HEADERS = { 'x-admin-auth': 'e2e-contact-admin' };
+const ADMIN_HEADERS = await getContactAdminHeaders();
 const MOCK_ACCEPTED = { ...ADMIN_HEADERS, 'x-contact-provider-mock-result': 'accepted' };
 const run = Date.now();
 let providerId: number;
