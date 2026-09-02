@@ -176,7 +176,7 @@ test.describe.serial('Contact Hub browser safety', () => {
     const modal = page.locator('.contact-modal');
     await expect(modal.getByText(/leave blank while editing/i)).toBeVisible();
     const editedName = `${browserProviderName} Edited`;
-    await modal.getByLabel('Name').fill(editedName);
+    await modal.locator('input').first().fill(editedName);
     await modal.getByRole('button', { name: 'Save' }).click();
     const editedRow = page.locator('.provider-row', { hasText: editedName });
     await expect(editedRow).toBeVisible();
