@@ -32,6 +32,8 @@ type Bindings = {
     CONTACT_MAIL_MODE: string | boolean | undefined
     CONTACT_ALLOWED_ORIGINS: string | string[] | undefined
     CONTACT_DNS_CACHE_TTL_SECONDS: string | number | undefined
+    CONTACT_ADMIN_SESSION_TTL_SECONDS: string | number | undefined
+    CONTACT_E2E_FAIL_SIDE_EFFECTS: string | string[] | undefined
     TITLE: string | undefined
     ANNOUNCEMENT: string | undefined | null
     ALWAYS_SHOW_ANNOUNCEMENT: string | boolean | undefined

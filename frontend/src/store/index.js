@@ -92,6 +92,7 @@ export const useGlobalState = createGlobalState(
         const showAdminAuth = ref(false);
         const auth = useStorage('auth', '');
         const adminAuth = useStorage('adminAuth', '');
+        const contactAdminToken = useSessionStorage('contactAdminToken', '');
         const jwt = useStorage('jwt', '');
         const addressPassword = useSessionStorage('addressPassword', '');
         const adminTab = useSessionStorage('adminTab', "account");
@@ -168,6 +169,7 @@ export const useGlobalState = createGlobalState(
             auth,
             jwt,
             adminAuth,
+            contactAdminToken,
             showAdminAuth,
             adminTab,
             adminMailTabAddress,

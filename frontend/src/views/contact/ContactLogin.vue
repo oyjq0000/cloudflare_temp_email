@@ -9,7 +9,7 @@ import { hashPassword } from '../../utils'
 
 const emit = defineEmits(['authenticated'])
 const {
-  adminAuth,
+  contactAdminToken,
   auth,
   openSettings,
   userJwt,
@@ -74,14 +74,15 @@ const signIn = async () => {
     await unlockSite()
     if (method.value === 'password') {
       if (!adminPassword.value) throw new Error(copy.value.required)
-      await api.fetch('/open_api/admin_login', {
+      const result = await api.fetch('/open_api/contact_admin_login', {
         method: 'POST',
         body: JSON.stringify({
           password: await hashPassword(adminPassword.value),
           cf_token: cfToken.value,
         }),
       })
-      adminAuth.value = adminPassword.value
+      contactAdminToken.value = result.token
+      adminPassword.value = ''
     } else {
       if (!email.value || !accountPassword.value) throw new Error(copy.value.required)
       const result = await api.fetch('/user_api/login', {
@@ -98,6 +99,7 @@ const signIn = async () => {
         userJwt.value = ''
         throw new Error(copy.value.roleRequired)
       }
+      accountPassword.value = ''
     }
     emit('authenticated')
   } catch (error) {

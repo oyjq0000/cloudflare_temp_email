@@ -14,6 +14,7 @@ import ContactCompose from '../../components/contact/ContactCompose.vue'
 import ContactSent from '../../components/contact/ContactSent.vue'
 import ContactOperations from '../../components/contact/ContactOperations.vue'
 import { contactApi } from '../../api/contact'
+import { clearLegacyContactAdminPassword } from '../../utils/contact-auth'
 
 const { openSettings, userSettings } = useGlobalState()
 const { locale } = useI18n({ useScope: 'global' })
@@ -111,7 +112,8 @@ const openOutbound = (status) => {
 
 const signOut = () => {
   const state = useGlobalState()
-  state.adminAuth.value = ''
+  state.contactAdminToken.value = ''
+  clearLegacyContactAdminPassword(state.adminAuth)
   state.userJwt.value = ''
   userSettings.value.is_admin = false
   authorized.value = false

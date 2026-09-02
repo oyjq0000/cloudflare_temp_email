@@ -12,6 +12,7 @@ import { api as apiSendMail } from './mails_api/send_mail_api'
 import { api as telegramApi } from './telegram_api'
 import { api as contactApi } from './contact'
 import { contactCors } from './contact/cors'
+import { parseContactAdminAuthorization, verifyContactAdminSession } from './contact/security/admin_session'
 
 import i18n from './i18n';
 import { email } from './email';
@@ -242,22 +243,60 @@ app.use('/user_api/*', async (c, next) => {
 });
 // admin auth
 app.use('/admin/*', async (c, next) => {
+	const lang = c.req.raw.headers.get("x-lang") || c.env.DEFAULT_LANG;
+	const msgs = i18n.getMessages(lang);
+	const contactAdminPath = c.req.path === '/admin/contact' || c.req.path.startsWith('/admin/contact/')
 
-	// check header x-admin-auth
+	if (contactAdminPath) {
+		const authorization = parseContactAdminAuthorization(c.req.raw.headers.get('Authorization'))
+		if (authorization.present) {
+			if (
+				authorization.token
+				&& await verifyContactAdminSession(authorization.token, c.env.JWT_SECRET)
+			) {
+				await next()
+				return
+			}
+			return c.text(msgs.NeedAdminPasswordMsg, 401)
+		}
+
+		const accessToken = c.req.raw.headers.get('x-user-access-token')
+		if (c.env.ADMIN_USER_ROLE && accessToken) {
+			try {
+				const payload = await Jwt.verify(accessToken, c.env.JWT_SECRET, 'HS256')
+				if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) {
+					return c.text(msgs.UserAcceesTokenExpiredMsg, 401)
+				}
+				if (payload.user_role !== c.env.ADMIN_USER_ROLE) {
+					return c.text(msgs.UserRoleIsNotAdminMsg, 401)
+				}
+				await next()
+				return
+			} catch {
+				return c.text(msgs.UserAcceesTokenExpiredMsg, 401)
+			}
+		}
+
+		if (
+			getBooleanValue(c.env.DISABLE_ADMIN_PASSWORD_CHECK)
+			&& getBooleanValue(c.env.E2E_TEST_MODE)
+		) {
+			await next()
+			return
+		}
+		return c.text(msgs.NeedAdminPasswordMsg, 401)
+	}
+
+	// Temp/legacy admin paths retain the upstream password behavior.
 	if (checkIsAdmin(c)) {
 		await next();
 		return;
 	}
-	const lang = c.req.raw.headers.get("x-lang") || c.env.DEFAULT_LANG;
-	const msgs = i18n.getMessages(lang);
-	// check if user is admin
 	const access_token = c.req.raw.headers.get("x-user-access-token");
 	if (c.env.ADMIN_USER_ROLE && access_token) {
 		try {
 			const payload = await Jwt.verify(access_token, c.env.JWT_SECRET, "HS256");
-			// check expired
 			if (!payload.exp) return c.text(msgs.UserAcceesTokenExpiredMsg, 401);
-			// exp is in seconds
 			if (payload.exp < Math.floor(Date.now() / 1000)) {
 				return c.text(msgs.UserAcceesTokenExpiredMsg, 401)
 			}
@@ -271,7 +310,6 @@ app.use('/admin/*', async (c, next) => {
 		}
 	}
 
-	// disable admin api check
 	if (
 		getBooleanValue(c.env.DISABLE_ADMIN_PASSWORD_CHECK)
 		&& (
@@ -285,6 +323,7 @@ app.use('/admin/*', async (c, next) => {
 
 	return c.text(msgs.NeedAdminPasswordMsg, 401)
 });
+
 
 
 app.route('/', commonApi)
