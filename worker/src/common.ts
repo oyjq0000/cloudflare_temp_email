@@ -868,9 +868,8 @@ export async function sendWebhook(
         body: body
     });
     if (!response.ok) {
-        console.log("send webhook error", settings.url, settings.method, settings.headers, body);
-        console.log("send webhook error", response.status, response.statusText);
-        return { success: false, message: `send webhook error: ${response.status} ${response.statusText}` };
+        console.error("send webhook error", { status: response.status });
+        return { success: false, message: `send webhook error: ${response.status}` };
     }
     return { success: true }
 }
@@ -880,7 +879,8 @@ export async function triggerWebhook(
     address: string,
     parsedEmailContext: ParsedEmailContext,
     message_id: string | null,
-    aiExtract?: ExtractResult | null
+    aiExtract?: ExtractResult | null,
+    rethrowOnError = false,
 ): Promise<void> {
     if (!c.env.KV || !getBooleanValue(c.env.ENABLE_WEBHOOK)) {
         return
@@ -933,7 +933,12 @@ export async function triggerWebhook(
     for (const settings of webhookList) {
         const res = await sendWebhook(settings, webhookMail);
         if (!res.success) {
-            console.error(res.message);
+            console.error('Webhook delivery failed');
+            if (rethrowOnError) {
+                const error = new Error('Webhook delivery failed')
+                error.name = 'WebhookDeliveryError'
+                throw error
+            }
         }
     }
 }
@@ -941,7 +946,8 @@ export async function triggerWebhook(
 export async function triggerAnotherWorker(
     c: Context<HonoCustomType>,
     rpcEmailMessage: RPCEmailMessage,
-    parsedText: string | undefined | null
+    parsedText: string | undefined | null,
+    rethrowOnError = false,
 ): Promise<void> {
     if (!parsedText) {
         return;
@@ -981,10 +987,11 @@ export async function triggerAnotherWorker(
                 bodyObj.headers = headerObj
             }
             const requestBody = JSON.stringify(bodyObj);
-            console.log(`exec worker , binding = ${bindingName} , requestBody = ${requestBody}`);
+            console.log('exec another worker', { binding: bindingName, method: methodName });
             await method(requestBody);
         } catch (e1) {
-            console.error(`execute method = ${methodName} error`, e1);
+            console.error('execute another worker error', { method: methodName, error: (e1 as Error).name || 'Error' });
+            if (rethrowOnError) throw e1
         }
     }
 }

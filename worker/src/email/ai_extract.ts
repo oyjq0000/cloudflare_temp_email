@@ -242,7 +242,8 @@ export async function extractEmailInfo(
     parsedEmailContext: ParsedEmailContext,
     env: Bindings,
     message_id: string | null,
-    address: string
+    address: string,
+    rethrowOnError = false,
 ): Promise<ExtractResult | null> {
     try {
         // Check if extraction is enabled via environment variable
@@ -313,7 +314,8 @@ export async function extractEmailInfo(
         }
         return result;
     } catch (e) {
-        console.error('AI email extraction error:', e);
+        console.error('AI email extraction error', { error: (e as Error).name || 'Error' });
+        if (rethrowOnError) throw e
         return null;
     }
 }

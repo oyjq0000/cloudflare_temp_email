@@ -6,18 +6,21 @@ import { auto_reply } from '../../email/auto_reply'
 import { check_if_junk_mail } from '../../email/check_junk'
 import { forwardEmail } from '../../email/forward'
 import { sendMailToTelegram } from '../../telegram_api'
-import { normalizeAddressDomain } from '../../utils'
+import { getBooleanValue, getStringArray, normalizeAddressDomain } from '../../utils'
 import type { ContactParsedMime } from './mime'
-import { parseContactMime, toLegacyParsedEmailContext } from './mime'
+import { normalizeSenderDate, parseContactMime, toLegacyParsedEmailContext } from './mime'
 import {
     findContactInboundMailbox,
     persistContactMessage,
     persistContactObjects,
 } from './persistence'
+import {
+    type ContactSideEffect,
+    runTrackedContactSideEffect,
+} from './side_effects'
 
 const fallbackParsedMime = (
     message: ForwardableEmailMessage,
-    receivedAt: string,
 ): ContactParsedMime => ({
     fromName: null,
     fromAddress: message.from.trim().toLowerCase() || null,
@@ -34,23 +37,43 @@ const fallbackParsedMime = (
     messageId: message.headers.get('Message-ID')?.trim() || null,
     inReplyTo: message.headers.get('In-Reply-To')?.trim() || null,
     references: (message.headers.get('References') || '').split(/\s+/).filter(Boolean).slice(-100),
-    receivedAt,
+    senderDate: normalizeSenderDate(message.headers.get('Date')),
     attachments: [],
     contentTruncated: false,
 })
 
-const runPersistedSideEffects = async (
+const maybeInjectSideEffectFailure = (env: Bindings, effect: ContactSideEffect): void => {
+    if (!getBooleanValue(env.E2E_TEST_MODE)) return
+    if (!getStringArray(env.CONTACT_E2E_FAIL_SIDE_EFFECTS).includes(effect)) return
+    const error = new Error('Injected Contact side effect failure') as Error & { code?: string }
+    error.name = 'ContactSideEffectInjectedError'
+    error.code = 'E2E_SIDE_EFFECT_FAILURE'
+    throw error
+}
+
+export const runPersistedSideEffects = async (
     message: ForwardableEmailMessage,
     env: Bindings,
+    persistedMessageId: number,
     toAddress: string,
     rawEmail: string,
     parsedEmailContext: ParsedEmailContext,
     messageId: string | null,
-) => {
-    await forwardEmail(message, env)
+): Promise<void> => {
+    let aiExtractResult: Awaited<ReturnType<typeof extractEmailInfo>> = null
 
-    const aiExtractResult = await extractEmailInfo(parsedEmailContext, env, messageId, toAddress)
-    try {
+    await runTrackedContactSideEffect(env.DB, persistedMessageId, 'forward', async () => {
+        maybeInjectSideEffectFailure(env, 'forward')
+        await forwardEmail(message, env, true)
+    })
+
+    await runTrackedContactSideEffect(env.DB, persistedMessageId, 'ai_extract', async () => {
+        maybeInjectSideEffectFailure(env, 'ai_extract')
+        aiExtractResult = await extractEmailInfo(parsedEmailContext, env, messageId, toAddress, true)
+    })
+
+    await runTrackedContactSideEffect(env.DB, persistedMessageId, 'telegram', async () => {
+        maybeInjectSideEffectFailure(env, 'telegram')
         await sendMailToTelegram(
             { env } as Context<HonoCustomType>,
             toAddress,
@@ -58,38 +81,43 @@ const runPersistedSideEffects = async (
             messageId,
             aiExtractResult,
         )
-    } catch (error) {
-        console.error('Contact Telegram side effect failed', { error: (error as Error).name || 'Error' })
-    }
-    try {
+    })
+
+    await runTrackedContactSideEffect(env.DB, persistedMessageId, 'webhook', async () => {
+        maybeInjectSideEffectFailure(env, 'webhook')
         await triggerWebhook(
             { env } as Context<HonoCustomType>,
             toAddress,
             parsedEmailContext,
             messageId,
             aiExtractResult,
+            true,
         )
-    } catch (error) {
-        console.error('Contact webhook side effect failed', { error: (error as Error).name || 'Error' })
-    }
-    try {
+    })
+
+    await runTrackedContactSideEffect(env.DB, persistedMessageId, 'another_worker', async () => {
+        maybeInjectSideEffectFailure(env, 'another_worker')
         const parsedEmail = await commonParseMail(parsedEmailContext)
         await triggerAnotherWorker(
             { env } as Context<HonoCustomType>,
             { from: message.from, to: toAddress, rawEmail, headers: message.headers },
             parsedEmail?.text || '',
+            true,
         )
-    } catch (error) {
-        console.error('Contact Worker side effect failed', { error: (error as Error).name || 'Error' })
-    }
-    await auto_reply(message, env, toAddress)
+    })
+
+    await runTrackedContactSideEffect(env.DB, persistedMessageId, 'auto_reply', async () => {
+        maybeInjectSideEffectFailure(env, 'auto_reply')
+        await auto_reply(message, env, toAddress, true)
+    })
 }
 
 export const receiveContactEmail = async (
     message: ForwardableEmailMessage,
     env: Bindings,
-    _ctx: ExecutionContext,
+    ctx: ExecutionContext,
 ): Promise<void> => {
+    const receivedAt = new Date().toISOString()
     const toAddress = normalizeAddressDomain(message.to)
     const mailbox = await findContactInboundMailbox(env.DB, toAddress)
     if (!mailbox) {
@@ -107,7 +135,7 @@ export const receiveContactEmail = async (
     } catch (error) {
         parseStatus = 'failed'
         parseError = (error as Error).name?.slice(0, 100) || 'ParseError'
-        parsed = fallbackParsedMime(message, new Date().toISOString())
+        parsed = fallbackParsedMime(message)
     }
     const parsedEmailContext = toLegacyParsedEmailContext(rawEmail, parsed)
 
@@ -130,6 +158,7 @@ export const receiveContactEmail = async (
             spamReason: isJunk ? 'authentication-policy' : null,
             parseStatus,
             parseError,
+            receivedAt,
         })
     } catch (error) {
         message.setReject('Contact message persistence failed')
@@ -149,12 +178,13 @@ export const receiveContactEmail = async (
     }
 
     if (isJunk || parseStatus === 'failed') return
-    await runPersistedSideEffects(
+    ctx.waitUntil(runPersistedSideEffects(
         message,
         env,
+        persisted.id,
         toAddress,
         rawEmail,
         parsedEmailContext,
         parsed.messageId,
-    )
+    ))
 }

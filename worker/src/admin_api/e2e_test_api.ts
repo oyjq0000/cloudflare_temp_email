@@ -42,6 +42,7 @@ const receiveMail = async (c: Context<HonoCustomType>) => {
         force_d1_failure,
         force_junk_check,
         force_forward,
+        fail_side_effects,
     } = await c.req.json();
     if (!from || !to || !raw) {
         return c.text("from, to and raw are required", 400);
@@ -107,12 +108,15 @@ const receiveMail = async (c: Context<HonoCustomType>) => {
         }
     }
     if (force_forward) env = { ...env, FORWARD_ADDRESS_LIST: ['side-effect@example.test'] }
+    if (Array.isArray(fail_side_effects)) env = { ...env, CONTACT_E2E_FAIL_SIDE_EFFECTS: fail_side_effects }
+    const waitUntilPromises: Promise<unknown>[] = []
     const executionContext: ExecutionContext = {
-        waitUntil: () => {},
+        waitUntil: (promise) => { waitUntilPromises.push(Promise.resolve(promise)) },
         passThroughOnException: () => {},
         props: {}
     };
     await emailHandler(mockMessage, env, executionContext);
+    await Promise.allSettled(waitUntilPromises)
 
     return c.json({
         success: !state.rejected,
@@ -141,7 +145,11 @@ const contactMessage = async (c: Context<HonoCustomType>) => {
     const count = await c.env.DB.prepare(`
         SELECT COUNT(*) AS count FROM contact_messages m WHERE ${conditions.join(' AND ')}
     `).bind(...values).first<number>('count') || 0
-    if (!message) return c.json({ message: null, count, attachments: [] })
+    if (!message) return c.json({ message: null, count, attachments: [], sideEffects: [] })
+    const sideEffects = await c.env.DB.prepare(`
+        SELECT effect, status, attempt_count, last_error_code, last_error_class
+        FROM contact_message_side_effects WHERE message_id = ? ORDER BY id
+    `).bind(message.id).all<Record<string, unknown>>()
     const { results } = await c.env.DB.prepare(`
         SELECT id, filename, mime_type, disposition, content_id, size, sha256,
             storage_key, storage_status
@@ -157,7 +165,7 @@ const contactMessage = async (c: Context<HonoCustomType>) => {
             ))
         }
     }
-    return c.json({ message, count, attachments: results || [], rawObjectStored, attachmentObjectsStored })
+    return c.json({ message, count, attachments: results || [], sideEffects: sideEffects.results || [], rawObjectStored, attachmentObjectsStored })
 }
 
 const contactProviderSend = async (c: Context<HonoCustomType>) => {
