@@ -72,7 +72,7 @@ const loadStatus = async () => {
     migration.value = await contactApi.getMigrationStatus()
     if (!migration.value.pending?.length) {
       const [storageResult, domainResult] = await Promise.all([
-        contactApi.getStorageStatus(), contactApi.listDomains(),
+        contactApi.getStorageStatus(), contactApi.listDomains(), refreshCounts(),
       ])
       storage.value = storageResult
       domains.value = domainResult.results || []
@@ -91,6 +91,7 @@ const migrate = async () => {
     migration.value = await contactApi.migrate()
     storage.value = await contactApi.getStorageStatus()
     domains.value = (await contactApi.listDomains()).results || []
+    await refreshCounts()
   } finally {
     migrating.value = false
   }
@@ -98,6 +99,11 @@ const migrate = async () => {
 
 const refreshDomains = async () => {
   domains.value = (await contactApi.listDomains()).results || []
+}
+
+const refreshCounts = async () => {
+  const result = await contactApi.getMessageCounts()
+  counts.value = { inbox: result.inbox || 0, unread: result.unread || 0, spam: result.spam || 0 }
 }
 
 const openInbox = (folder = 'inbox', unreadOnly = false, domainId = null) => {
@@ -188,7 +194,7 @@ onMounted(async () => {
               :domain-id="inboxView.domainId"
               :folder="inboxView.folder"
               :unread-only="inboxView.unreadOnly"
-              @counts="value => counts = value"
+              @changed="refreshCounts"
             />
             <DomainManager v-else-if="activeSection === 'domains'" @changed="refreshDomains" />
             <MailboxManager v-else-if="activeSection === 'mailboxes'" />

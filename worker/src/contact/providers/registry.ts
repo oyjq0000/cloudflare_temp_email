@@ -1,5 +1,6 @@
 import type { ContactProviderConfig } from './config_service.ts'
 import { BrevoProvider } from './brevo.ts'
+import { resolveProviderHttpTimeoutMs } from './http.ts'
 import { ResendProvider } from './resend.ts'
 import { resolveProviderSecrets } from './secret_resolver.ts'
 import { SmtpProvider } from './smtp.ts'
@@ -48,5 +49,6 @@ export const sendWithContactProvider = async (
     return registry.get(providerConfig.providerType).send(message, {
         config: providerConfig.config,
         secrets,
+        httpTimeoutMs: resolveProviderHttpTimeoutMs(env.CONTACT_PROVIDER_HTTP_TIMEOUT_MS),
     })
 }

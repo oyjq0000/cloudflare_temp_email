@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 
 import { getContactAdminSecurityStatus, resolveAppMode } from '../app_mode'
 import * as dbApi from './db/api'
+import { CONTACT_SCHEMA_VERSION } from './db/migrations'
 import * as dnsApi from './dns/api'
 import * as domainApi from './domains/api'
 import * as mailboxApi from './mailboxes/api'
@@ -30,7 +31,8 @@ api.get('/admin/contact/status', c => c.json({
     ok: true,
     mode: resolveAppMode(c.env),
     adminSecurity: getContactAdminSecurityStatus(c.env),
-    phase: 7,
+    release: 'v1-rc',
+    schemaVersion: CONTACT_SCHEMA_VERSION,
 }))
 
 api.get('/admin/contact/db/version', dbApi.getVersion)
@@ -59,6 +61,7 @@ api.get('/admin/contact/providers/:id', providerApi.get)
 api.patch('/admin/contact/providers/:id', providerApi.update)
 api.delete('/admin/contact/providers/:id', providerApi.remove)
 
+api.get('/admin/contact/message-counts', messageApi.counts)
 api.get('/admin/contact/messages', messageApi.list)
 api.get('/admin/contact/messages/:id', messageApi.get)
 api.post('/admin/contact/messages/:id/reply', outboundApi.reply)

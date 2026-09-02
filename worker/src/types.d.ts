@@ -33,7 +33,9 @@ type Bindings = {
     CONTACT_ALLOWED_ORIGINS: string | string[] | undefined
     CONTACT_DNS_CACHE_TTL_SECONDS: string | number | undefined
     CONTACT_ADMIN_SESSION_TTL_SECONDS: string | number | undefined
+    CONTACT_PROVIDER_HTTP_TIMEOUT_MS: string | number | undefined
     CONTACT_E2E_FAIL_SIDE_EFFECTS: string | string[] | undefined
+    CONTACT_E2E_FORCE_PARSE_FAILURE: string | boolean | undefined
     TITLE: string | undefined
     ANNOUNCEMENT: string | undefined | null
     ALWAYS_SHOW_ANNOUNCEMENT: string | boolean | undefined

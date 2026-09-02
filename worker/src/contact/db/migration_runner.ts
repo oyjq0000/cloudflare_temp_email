@@ -1,4 +1,4 @@
-import { CONTACT_MIGRATIONS, CONTACT_SCHEMA_VERSION } from './migrations'
+import { CONTACT_MIGRATIONS, CONTACT_SCHEMA_VERSION } from './migrations.ts'
 
 type AppliedMigrationRow = {
     version: number
