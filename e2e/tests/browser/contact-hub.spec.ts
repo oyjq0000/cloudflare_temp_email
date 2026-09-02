@@ -168,7 +168,7 @@ test.describe.serial('Contact Hub browser safety', () => {
   test('edits, disables and re-enables Providers without exposing secret references, and blocks in-use disable in UI', async ({ page }) => {
     await signIn(page);
     await page.locator('.hub-sidebar nav').last().getByRole('button', { name: 'Providers' }).click();
-    await expect(page.getByText('Provider configs')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Provider configs', exact: true })).toBeVisible();
     await expect(page.locator('body')).not.toContainText(browserSecretReference);
 
     const hiddenRow = page.locator('.provider-row', { hasText: browserProviderName });

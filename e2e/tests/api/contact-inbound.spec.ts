@@ -194,8 +194,9 @@ test.describe.serial('Contact inbound persistence', () => {
   test('isolates every post-persist side effect and records durable status without re-running dedupe', async ({ request }) => {
     const effects = ['forward', 'ai_extract', 'telegram', 'webhook', 'another_worker', 'auto_reply'];
     for (const effect of effects) {
-      const address = await createMailbox(request, `effect-${effect}`);
-      const messageId = `<effect-${effect}-${run}@example.net>`;
+      const fixtureLabel = effect.replaceAll('_', '-');
+      const address = await createMailbox(request, `effect-${fixtureLabel}`);
+      const messageId = `<effect-${fixtureLabel}-${run}@example.net>`;
       const raw = plainMail(address, messageId, `failure injection ${effect}`);
       const first = await receive(request, address, raw, { fail_side_effects: [effect], force_forward: true });
       expect((await first.json()).success).toBe(true);
