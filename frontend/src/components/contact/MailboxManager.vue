@@ -110,10 +110,10 @@ defineExpose({ load })
           </div>
           <n-space align="center" wrap>
             <n-tag v-if="mailbox.is_default" type="success">{{ copy.default }}</n-tag>
-            <label><span>{{ copy.enabled }}</span><n-switch :value="mailbox.enabled" @update:value="value => update(mailbox, { enabled: value })" /></label>
+            <label><span>{{ copy.enabled }}</span><n-switch :value="mailbox.enabled" :disabled="mailbox.is_default" @update:value="value => update(mailbox, { enabled: value })" /></label>
             <label><span>{{ copy.inbound }}</span><n-switch :value="mailbox.inbound_enabled" @update:value="value => update(mailbox, { inbound_enabled: value })" /></label>
-            <label><span>{{ copy.outbound }}</span><n-switch :value="mailbox.outbound_enabled" @update:value="value => update(mailbox, { outbound_enabled: value })" /></label>
-            <n-button v-if="!mailbox.is_default" size="small" @click="update(mailbox, { is_default: true })">{{ copy.setDefault }}</n-button>
+            <label><span>{{ copy.outbound }}</span><n-switch :value="mailbox.outbound_enabled" :disabled="mailbox.is_default" @update:value="value => update(mailbox, { outbound_enabled: value })" /></label>
+            <n-button v-if="!mailbox.is_default && mailbox.enabled && mailbox.outbound_enabled" size="small" @click="update(mailbox, { is_default: true })">{{ copy.setDefault }}</n-button>
             <n-button v-if="!mailbox.is_default" size="small" tertiary type="warning" @click="disable(mailbox)">{{ copy.disable }}</n-button>
           </n-space>
         </div>
