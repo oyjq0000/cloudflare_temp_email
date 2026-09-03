@@ -131,4 +131,6 @@ dist
 
 .wrangler
 wrangler.toml
-.dev.vars
+# Wrangler local development secrets; environment-specific variants are included.
+.dev.vars*
+.env*

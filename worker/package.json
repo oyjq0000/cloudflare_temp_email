@@ -9,7 +9,12 @@
     "lint": "eslint src",
     "deploy": "wrangler deploy --minify",
     "start": "wrangler dev",
-    "build": "wrangler deploy --dry-run --config wrangler.ci.toml --outdir dist --minify"
+    "build": "wrangler deploy --dry-run --config wrangler.ci.toml --outdir dist --minify",
+    "dev:staging": "wrangler dev --env staging",
+    "dry-run:staging": "wrangler deploy --env staging --dry-run --minify",
+    "deploy:staging": "wrangler deploy --env staging --minify",
+    "dry-run:production": "wrangler deploy --env production --dry-run --minify",
+    "deploy:production": "wrangler deploy --env production --minify"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260819.1",

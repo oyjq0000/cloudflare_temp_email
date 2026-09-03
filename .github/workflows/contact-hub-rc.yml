@@ -41,6 +41,26 @@ jobs:
       - name: Worker dry-run build
         working-directory: worker
         run: pnpm run build
+      - name: Validate Contact Hub named environment deployment config
+        working-directory: worker
+        run: |
+          if grep -Eq '^[[:space:]]*(JWT_SECRET|ADMIN_PASSWORDS|CONTACT_[A-Z0-9_]*(API_KEY|PASSWORD)|CLOUDFLARE_API_TOKEN)[[:space:]]*=' wrangler.toml.template; then
+            echo "Secret-like values must not be assigned in wrangler.toml.template" >&2
+            exit 1
+          fi
+          cp wrangler.toml.template wrangler.toml
+          python - <<'PYCONFIG'
+          from pathlib import Path
+          path = Path("wrangler.toml")
+          text = path.read_text()
+          text = text.replace("<STAGING_D1_ID>", "00000000-0000-0000-0000-000000000001")
+          text = text.replace("<PRODUCTION_D1_ID>", "00000000-0000-0000-0000-000000000002")
+          path.write_text(text)
+          PYCONFIG
+          mkdir -p ../frontend/dist
+          printf '<!doctype html><title>contact-hub-ci</title>' > ../frontend/dist/index.html
+          pnpm run dry-run:staging
+          pnpm run dry-run:production
 
   frontend:
     name: Frontend unit and production build
@@ -65,6 +85,9 @@ jobs:
       - name: Frontend production build
         working-directory: frontend
         run: pnpm run build
+      - name: Frontend Contact Hub same-origin build
+        working-directory: frontend
+        run: pnpm run build:pages
 
   contact-and-temp-e2e:
     name: Contact + Temp Docker E2E
