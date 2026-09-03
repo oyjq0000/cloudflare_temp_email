@@ -1,193 +1,160 @@
 # Contact Hub V1 Deployment, Migration, Backup, and Rollback Runbook
 
-This runbook is intentionally manual. V1 implementation did not deploy a Worker or Pages project, mutate Email Routing/DNS, create production D1/R2 resources, set a real Secret, or push a branch.
+Reviewed deployment baseline: `contact-hub` at `3ed8d828a8e157ef354a3c6e0d7019ec7a18b5d1`.
 
-## 1. Preflight
+This document covers deployment readiness only. It does not authorize a production deployment.
 
-1. Review the complete `contact-hub` branch and the Phase commits in `PROGRESS.md`.
-2. Run the Worker, frontend, Temp, Contact, browser-security, and Mailpit suites from `FINAL_REPORT.md` in a clean staging environment.
-3. Confirm the frontend and Worker origins. Prefer same-origin Pages/Worker routing. If they differ, enumerate each exact HTTPS frontend origin.
-4. Inventory existing Email Routing rules, MX/SPF/DKIM/DMARC records, D1 database name/id, Worker routes, Pages project, and Legacy Temp settings.
-5. Choose a maintenance window that permits an inbound routing smoke test and immediate code rollback.
+## 1. V1 deployment architecture
 
-## 2. Required configuration
-
-Keep ordinary variables in the reviewed Wrangler environment and values with credential material in Worker Secrets.
-
-```toml
-[vars]
-CONTACT_MAIL_MODE = true
-CONTACT_ALLOWED_ORIGINS = ["https://mail.example.com"]
-CONTACT_DNS_CACHE_TTL_SECONDS = 3600
-CONTACT_ADMIN_SESSION_TTL_SECONDS = 14400 # 900-28800
-CONTACT_PROVIDER_HTTP_TIMEOUT_MS = 15000 # 1000-60000
-# Use this only when administrator accounts/roles are the chosen login mechanism.
-ADMIN_USER_ROLE = "admin"
-DISABLE_ADMIN_PASSWORD_CHECK = false
-
-[[d1_databases]]
-binding = "DB"
-database_name = "reviewed-production-database"
-database_id = "reviewed-production-id"
-
-[[r2_buckets]]
-binding = "CONTACT_R2"
-bucket_name = "private-contact-mail"
-```
-
-Requirements:
-
-- Set exactly one Contact-mode switch: `CONTACT_MAIL_MODE=true`.
-- Configure `ADMIN_PASSWORDS` as a Worker Secret or use a verified `ADMIN_USER_ROLE`. Password-based Contact login exchanges the password for a scoped Contact Admin Session; the browser must not persist the raw password. Never enable `DISABLE_ADMIN_PASSWORD_CHECK` in production.
-- Set `JWT_SECRET` as credential material using the deployment system's secret facility even if an existing template shows it as a variable.
-- Keep `E2E_TEST_MODE` absent/false in production. It exposes only test helpers when true.
-- `CONTACT_ALLOWED_ORIGINS` accepts exact origins only. Do not use `*`, a path, query, credentials, or a trailing application route.
-- `CONTACT_ADMIN_SESSION_TTL_SECONDS` defaults to 14400 seconds and is constrained to 900–28800. `CONTACT_PROVIDER_HTTP_TIMEOUT_MS` defaults to 15000 ms and is constrained to 1000–60000; HTTP timeout remains an Unknown delivery outcome.
-- `CONTACT_DNS_CACHE_TTL_SECONDS` accepts 60–86400 seconds and defaults to 3600.
-- `DOMAINS`/`DEFAULT_DOMAINS` remain Legacy Temp settings; they do not create Contact Domains or Mailboxes.
-- `CONTACT_R2` must point to a private bucket. Do not expose the bucket through a public custom domain.
-
-## 3. Worker Secret References
-
-Choose references per Provider Config and set their values manually. D1 receives only these names:
+Contact Hub V1 uses **one Cloudflare Worker with Static Assets**:
 
 ```text
-CONTACT_RESEND_MAIN_API_KEY
-CONTACT_BREVO_MAIN_API_KEY
-CONTACT_SMTP_MAIN_PASSWORD
+Browser
+  -> Contact Hub Worker
+       |- Vue frontend static assets (ASSETS)
+       |- Contact/Admin/Open APIs
+       |- Email Worker handler
+       |- D1
+       `- R2
 ```
 
-For each selected production Wrangler environment, run the interactive equivalent of:
+The frontend stays same-origin with `VITE_API_BASE=`. `worker/src/worker.ts` already serves non-API requests through the `ASSETS` binding, so no Pages `BACKEND` service binding is required for Contact Hub V1.
+
+The repository keeps the upstream Pages implementation for compatibility, but `pages/wrangler.toml` points `BACKEND` at the production Worker environment and **must not be used for Contact Hub staging**.
+
+## 2. Wrangler Named Environments
+
+Copy `worker/wrangler.toml.template` to the gitignored `worker/wrangler.toml`. The tracked template contains `<STAGING_D1_ID>` and `<PRODUCTION_D1_ID>` markers intentionally; do not pass the template itself to Wrangler.
+
+Use only explicit environment commands for Contact Hub operations:
 
 ```text
-npx wrangler secret put CONTACT_RESEND_MAIN_API_KEY
-npx wrangler secret put CONTACT_BREVO_MAIN_API_KEY
-npx wrangler secret put CONTACT_SMTP_MAIN_PASSWORD
-npx wrangler secret put JWT_SECRET
-# When password login is selected, enter a reviewed JSON string array at this prompt:
-npx wrangler secret put ADMIN_PASSWORDS
+pnpm run dev:staging
+pnpm run dry-run:staging
+pnpm run deploy:staging
+pnpm run dry-run:production
+pnpm run deploy:production
 ```
 
-Enter values only at the Secret prompt. Never add values to `wrangler.toml`, D1, issue text, logs, screenshots, test snapshots, or this repository.
+Do not rely on a long-lived `CLOUDFLARE_ENV` export for manual deployment. `--env staging` / `--env production` is the reviewed release boundary. The existing generic `pnpm run deploy` script is retained only for upstream compatibility and must not be used for Contact Hub staging or production.
 
-Provider Config examples submitted to `POST /admin/contact/providers` after authentication:
+The RC-tested compatibility date remains `2025-04-01`; changing it is a separate runtime-compatibility change and requires a new regression pass.
 
-```json
-{
-  "name": "Main Resend",
-  "provider_type": "resend",
-  "config": {},
-  "secret_refs": { "apiKey": "CONTACT_RESEND_MAIN_API_KEY" }
-}
+Wrangler bindings and `vars` are non-inheritable, so staging and production define their own D1, R2, and vars blocks. Static Assets is shared from the top level.
+
+## 3. Resource isolation
+
+Staging defaults:
+
+```text
+Worker: contact-mail-hub-staging
+D1:     contact-mail-hub-staging
+R2:     contact-mail-hub-staging (private)
+Web:    workers.dev first; custom hostname later
+Mail:   mail-staging.<approved-domain>
 ```
 
-```json
-{
-  "name": "Main Brevo",
-  "provider_type": "brevo",
-  "config": {},
-  "secret_refs": { "apiKey": "CONTACT_BREVO_MAIN_API_KEY" }
-}
+Production uses separate Worker, D1, R2, secrets, domains, and provider credentials. Never bind a staging environment to a production D1/R2 resource.
+
+R2 must remain private: do not enable `r2.dev` and do not attach a public custom domain.
+
+## 4. Secrets and local development
+
+Never store these in Wrangler vars, Git, D1, logs, screenshots, or documentation:
+
+- `JWT_SECRET`
+- `ADMIN_PASSWORDS`
+- `CONTACT_RESEND_*_API_KEY`
+- `CONTACT_BREVO_*_API_KEY`
+- `CONTACT_SMTP_*_PASSWORD`
+- Cloudflare API tokens
+
+Cloud secrets are set independently:
+
+```text
+wrangler secret put JWT_SECRET --env staging
+wrangler secret put ADMIN_PASSWORDS --env staging
+# Later, when Resend is selected:
+wrangler secret put CONTACT_RESEND_MAIN_API_KEY --env staging
 ```
 
-```json
-{
-  "name": "Main SMTP",
-  "provider_type": "smtp",
-  "config": {
-    "host": "smtp.example.net",
-    "port": 587,
-    "secure": false,
-    "starttls": true,
-    "username": "reviewed-account"
-  },
-  "secret_refs": { "password": "CONTACT_SMTP_MAIN_PASSWORD" }
-}
+Production secrets are configured separately with `--env production` and different values.
+
+For local development use `worker/.dev.vars.staging` or `worker/.dev.vars.production`. Environment-specific `.dev.vars.*` and `.env*` files are gitignored. Do not upload local-only values as Cloudflare secrets.
+
+## 5. Build and pre-deployment validation
+
+Worker:
+
+```text
+cd worker
+pnpm install --frozen-lockfile
+pnpm test
+pnpm run lint
+pnpm run build
 ```
 
-Resend/Brevo endpoints are fixed in code. SMTP host/port/TLS fields are non-secret; a password reference is mandatory when a username is present. Assign exactly one enabled Provider Config to each Domain. A failure never falls back to another Provider.
+Frontend:
 
-## 4. Backup before migration
+```text
+cd frontend
+pnpm install --frozen-lockfile
+pnpm test -- --run
+pnpm run build:pages
+```
 
-1. Record the currently deployed Worker/Pages revisions and export their reviewed configuration without Secret values.
-2. Export the remote D1 database to a timestamped, access-controlled location using the installed Wrangler version, for example:
+Then run `git diff --check`. After copying the template to `worker/wrangler.toml` and inserting the real staging D1 ID, run `pnpm run dry-run:staging` and review Worker name, D1, R2, Static Assets, vars, and absence of production resources or secret values.
 
-   ```text
-   npx wrangler d1 export <database-name> --remote --output <timestamp>-before-contact.sql
-   ```
+## 6. Staging deployment order
 
-3. Validate that the export exists, is non-empty, and can be parsed/imported into a disposable recovery database.
-4. Record the target R2 bucket and retention policy. Contact migration does not delete R2 objects; keep the bucket intact through rollback.
-5. Do not proceed if the backup or disposable restore validation fails.
+Do not enable Email Routing until Worker, D1, R2, migrations, administrator authentication, Contact Domain, and Mailbox are ready.
 
-## 5. Staging migration and setup
+1. `wrangler whoami` and confirm the intended Cloudflare account.
+2. Create `contact-mail-hub-staging` D1 and record its real `database_id`.
+3. Create private `contact-mail-hub-staging` R2.
+4. Put the D1 ID into local gitignored `worker/wrangler.toml`.
+5. Configure only `JWT_SECRET` and `ADMIN_PASSWORDS` first; do not configure Provider secrets yet.
+6. Build the frontend and run `pnpm run dry-run:staging`.
+7. Deploy with `pnpm run deploy:staging`.
+8. Verify `/health_check` and `/open_api/settings`; Contact mode must disable public mailbox, address creation, registration, public sending, and the user portal.
+9. Initialize/migrate the upstream database as required until `/admin/db_version` reports the code version (`v0.0.8` at this reviewed baseline).
+10. Run `/admin/contact/db/migrate` until Contact schema is version 7 and a repeated migration reports `pending=[]`.
+11. Verify `/admin/contact/storage/status` and `/admin/contact/health`. Before domain/provider setup require `adminReady=true`, `migrationReady=true`, and `storageReady=true`.
+12. Create the staging Contact Domain and fixed Mailbox before enabling Email Routing.
 
-1. Create a private staging R2 bucket and bind it as `CONTACT_R2`.
-2. Deploy reviewed code/config to staging only after human authorization; leave production untouched.
-3. Authenticate as an administrator and call `GET /admin/contact/db/version`.
-4. Call `POST /admin/contact/db/migrate`. Repeat it once and confirm the second call is a no-op with target version 7.
-5. Confirm upstream tables/data and the upstream DB version remain unchanged.
-6. Check `GET /admin/contact/storage/status` and `GET /admin/contact/health`; require `adminReady`, `migrationReady`, `storageReady`, `inboundReady`, and `productionReady` to match the intended staging topology. `outboundReady` is reported separately and requires an enabled Provider, a Domain bound to a Provider with its runtime Secret present, and an enabled outbound Mailbox.
-7. Create Provider Configs, then Domains and their fixed Mailboxes. Assign one explicit Provider Config to each Domain.
-8. Run an inbound Email Routing smoke message, metadata-only list/detail check, safe HTML/remote-image check, attachment download, and outbound Mailpit/sandbox-provider test.
-9. Exercise Failed Retry, an injected Unknown outcome, Force Resend warning, and stale-Sending reconciliation without using a real customer recipient.
+The detailed interactive sequence is in `STAGING_RUNBOOK.md`.
 
-## 6. Cloudflare Email Routing and DNS (manual)
+## 7. Email Routing and provider order
 
-For every Contact Domain:
+Use a mail hostname distinct from the web hostname, for example `mail-staging.<approved-domain>`. Create the Domain and `contact@...` Mailbox in Contact Hub before adding Cloudflare routing.
 
-1. Add/verify the domain in Cloudflare and enable Email Routing. Use the MX targets currently shown by the Cloudflare dashboard; do not copy stale values from documentation.
-2. Route each fixed address (`contact@`, `support@`, `privacy@`, `security@`, `hello@`, etc.) to the reviewed Email Worker. Create the same address first in Contact Hub so the D1 Mailbox is enabled when mail arrives.
-3. Preserve exactly one SPF TXT record. Merge Cloudflare/provider mechanisms into the existing `v=spf1` policy; never publish a second SPF record.
-4. Verify each outbound Domain with its selected provider. Publish the provider-supplied DKIM record at the exact selector. Enter that selector explicitly in Contact Hub; V1 does not guess selectors.
-5. Publish one `_dmarc.<domain>` record using the organization's reviewed policy and reporting addresses. Start with the organization's rollout policy; do not silently change enforcement.
-6. In Operations, enter any reviewed expected MX/SPF/DKIM/DMARC fragments and run Refresh. Resolver failures must remain Unknown and require external verification, not automatic record changes.
-7. Send one inbound and one outbound smoke message per Domain and confirm the expected From, Reply-To, Message-ID, thread headers, and provider acceptance.
+Use Cloudflare Dashboard's current Email Routing MX values; never copy historic MX targets. Do not create a catch-all for the first staging test.
 
-Contact Hub performs read-only DNS checks and never mutates Cloudflare DNS.
+Provider order for first staging verification:
 
-## 7. Production migration sequence
+1. Resend.
+2. Brevo only after Resend smoke passes.
+3. Generic SMTP last.
 
-Only after staging and review:
+DNS rules:
 
-1. Freeze configuration changes and take a new D1 export.
-2. Create/bind the private production `CONTACT_R2` bucket.
-3. Add the approved Worker Secrets and exact frontend origins.
-4. Deploy the reviewed Worker/frontend revision under human authorization.
-5. Authenticate and run the Contact migration once; verify version 7 and re-run to prove idempotency.
-6. Verify health/storage before enabling Email Routing rules.
-7. Create Provider Configs, Domains, and Mailboxes, then bind Email Routing one Domain at a time.
-8. Execute the staging smoke checklist against non-sensitive test recipients.
-9. Monitor `failed`, `unknown`, stale `sending`, storage degradation, and DNS Unknown/Missing/Invalid counts. Never auto-retry Unknown.
+- exactly one SPF record per hostname; merge mechanisms instead of publishing a second `v=spf1`;
+- use the provider-supplied DKIM selector exactly;
+- publish one `_dmarc` record; staging may use an approved observation policy, but this runbook does not choose production DMARC policy;
+- Contact Hub DNS checks are read-only; resolver failures remain `unknown`.
 
-## 8. Rollback
+## 8. Smoke tests
 
-Code rollback is preferred because Contact migrations 6–7 are additive and Temp Mode ignores the new Contact columns/table. Do not downgrade or delete `sender_date` or `contact_message_side_effects`; preserve D1/R2 and roll code forward after diagnosis if an older Contact build cannot understand schema 7.
+Before declaring staging ready, verify inbound Gmail/Outlook delivery, trusted `received_at`, HTML sanitization, blocked remote images, attachment metadata/R2/download, reply threading headers, provider acceptance, Failed Retry, Unknown Retry rejection, and explicit Force Resend behavior.
 
-1. Stop adding Domains/routing rules and capture health/outbound state. Do not resend Unknown messages.
-2. Roll back Worker/frontend code to the previously recorded revision under normal deployment review.
-3. Revert or pause the new Email Routing rules if the previous Worker cannot handle Contact addresses. Confirm the intended destination before changing routing.
-4. Do not downgrade, drop, or hand-edit Contact tables. Leaving additive Contact tables and private R2 objects in place preserves audit/recovery data.
-5. If disabling Contact Mode is necessary, first ensure incoming Contact routes no longer point to a Temp pipeline that could expose or clean long-lived addresses.
-6. Restore D1 only for confirmed data corruption, in a coordinated maintenance window. Validate the export in a new recovery database and rebind/swap after review; do not blindly import over a populated database.
-7. Keep the matching R2 bucket. D1 restoration and R2 object timestamps/keys must refer to the same recovery point; orphan cleanup is a separate, reviewed operation.
-8. Re-run Temp Mode core tests, administrator security checks, and inbound routing smoke tests after rollback.
+`outboundReady` is not required before the first provider is configured. After Domain/Mailbox/routing are complete, require `inboundReady=true` and `productionReady=true` for the intended staging topology; after the outbound provider is configured, verify `outboundReady=true` separately.
 
-## 9. Production checklist
+## 9. Backup and rollback
 
-- [ ] `contact-hub` branch reviewed
-- [ ] Temp Mode regression passed
-- [ ] Contact API/browser/Mailpit E2E passed
-- [ ] D1 export and disposable restore validated
-- [ ] Private R2 bucket created and `CONTACT_R2` bound
-- [ ] `ADMIN_PASSWORDS` or verified `ADMIN_USER_ROLE` configured
-- [ ] `DISABLE_ADMIN_PASSWORD_CHECK` false
-- [ ] `E2E_TEST_MODE` absent/false
-- [ ] Exact `CONTACT_ALLOWED_ORIGINS` configured
-- [ ] Provider values set only as Worker Secrets
-- [ ] Provider Domains verified
-- [ ] Email Routing points only reviewed fixed addresses to the Worker
-- [ ] MX/SPF/DKIM/DMARC manually verified
-- [ ] Contact migration version 7 applied and idempotency verified in staging
-- [ ] Inbound/outbound/security smoke tests passed
-- [ ] Unknown/rollback procedure rehearsed
+Before any migration of a non-empty staging/production D1, export it with the installed Wrangler version and verify the export can be parsed/restored into a disposable recovery database.
+
+Contact migrations 6-7 are additive. Roll back code before data: do not drop `sender_date`, `contact_message_side_effects`, Contact messages, outbound attempts, or R2 objects. Preserve the matching D1/R2 recovery point and revert Email Routing if an older Worker cannot safely accept Contact addresses.
+
+## 10. Production stop
+
+A successful staging run is a stop point. **Production is NOT DEPLOYED by this runbook.** Production requires a separate explicit approval, fresh backup, production-specific secrets/resources, and a reviewed production dry-run.

@@ -8,7 +8,7 @@ The V1 boundary is deliberately narrow: fixed mailboxes, unified inbox/search, s
 
 ## Baseline and integration seams
 
-The RC hardening baseline is `origin/contact-hub` `a4902cdd190ea1752de01370a9593562e0a45d58` with merge-base/origin main `70206c61efa723ef24143eca1d27449ce98a6e0c`. Product code remains on the Contact branch; `main` remains the upstream mirror.
+The deployment-readiness baseline is `origin/contact-hub` `3ed8d828a8e157ef354a3c6e0d7019ec7a18b5d1` with `origin/main` `70206c61efa723ef24143eca1d27449ce98a6e0c`. The RC hardening history remains documented in `RC_HARDENING_REPORT.md`; product code remains on the Contact branch and `main` remains the upstream mirror.
 
 Existing capabilities retained as compatibility seams:
 
@@ -25,37 +25,34 @@ New Contact business logic is isolated under `worker/src/contact/` (including Pr
 ## Runtime topology
 
 ```text
-Cloudflare Email Routing
-          |
-          v
-  Email Worker entry
-          |
-    resolveAppMode
-      /       \
-     v         v
-Temp pipeline  ContactInboundService
-                   |
-          parse MIME exactly once
-                   |
-            +------+------+
-            |             |
-            v             v
-            D1        CONTACT_R2
-      indexes/state   raw/attachments
-            |
-            v
- authenticated /admin/contact/* API
-            |
-            v
-       Private Hub UI
-            |
-            v
- ContactOutboundRouter
-      /       |       \
-  Resend    Brevo     SMTP
+Browser
+  |
+  v
+Contact Hub Worker
+  |- ASSETS -> Vue frontend
+  |- HTTP APIs -> D1 / CONTACT_R2
+  `- Email Worker entry <- Cloudflare Email Routing
+                          |
+                    resolveAppMode
+                      /       \
+                     v         v
+              Temp pipeline  ContactInboundService
+                                  |
+                           parse MIME exactly once
+                                  |
+                           +------+------+
+                           |             |
+                           v             v
+                           D1        CONTACT_R2
+                     indexes/state   raw/attachments
+                           |
+                           v
+                    ContactOutboundRouter
+                       /       |       \
+                   Resend    Brevo     SMTP
 ```
 
-Pages middleware continues to proxy API traffic to the Worker. No Contact secret or private entity is returned by `/open_api/settings`; that endpoint exposes only mode and public capability booleans.
+Contact Hub V1 deployment uses the Worker Static Assets binding rather than a Pages-to-Worker service binding. The upstream Pages implementation remains in the repository for compatibility, but it is not the Contact Hub staging topology. No Contact secret or private entity is returned by `/open_api/settings`; that endpoint exposes only mode and public capability booleans.
 
 ## Trust boundaries
 
